@@ -145,6 +145,20 @@ class CacheManager @Inject constructor(
     }
     
     /**
+     * Determines cache status level based on age with custom threshold.
+     */
+    fun getCacheLevel(timestamp: Long, maxAgeMs: Long): CacheLevel {
+        val age = System.currentTimeMillis() - timestamp
+        
+        return when {
+            age < maxAgeMs * 0.25 -> CacheLevel.FRESH      // < 25% of max age
+            age < maxAgeMs * 0.5 -> CacheLevel.STALE       // < 50% of max age
+            age < maxAgeMs -> CacheLevel.EXPIRED           // < 100% of max age
+            else -> CacheLevel.VERY_OLD                    // > max age
+        }
+    }
+    
+    /**
      * Formats cache age with appropriate warning indicator.
      */
     fun getCacheAgeDisplay(timestamp: Long): CacheAgeDisplay {

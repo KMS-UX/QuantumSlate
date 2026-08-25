@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,6 +45,9 @@ fun DataDenseDashboard(
             modifier = modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
+            val dashboardViewModel: DashboardViewModel = hiltViewModel()
+            val uiState by dashboardViewModel.uiState.collectAsState()
+            
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -56,34 +61,38 @@ fun DataDenseDashboard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TimeDateWidgetCompact()
+                    
+                    // Global refresh button
+                    IconButton(onClick = { dashboardViewModel.refreshAll() }) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Refresh,
+                            contentDescription = "Refresh All",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
 
                 // Grid of widgets
-                val weatherViewModel: WeatherViewModel = hiltViewModel()
-                val weatherState by weatherViewModel.weatherState.collectAsState()
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Weather widget
+                    // Weather widget with cache status
                     Card(
                         modifier = Modifier.weight(1f),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "Weather",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            WeatherWidget(
-                                weather = weatherState.weather,
-                                isLoading = weatherState.isLoading,
-                                errorMessage = weatherState.errorMessage
-                            )
-                        }
+                        WeatherWidgetWithStatus(
+                            weather = uiState.weather,
+                            isLoading = uiState.isWeatherLoading,
+                            errorMessage = uiState.weatherError,
+                            lastUpdated = uiState.weatherLastUpdated,
+                            cacheLevel = uiState.weatherLastUpdated?.let { 
+                                com.quantumslate.dashboard.data.local.CacheManager.getCacheLevel(it, 30 * 60 * 1000) 
+                            } ?: com.quantumslate.dashboard.data.local.CacheManager.CacheLevel.EXPIRED,
+                            onRefresh = { dashboardViewModel.refreshWidget(WidgetType.WEATHER) },
+                            modifier = Modifier.padding(12.dp)
+                        )
                     }
 
                     // Calendar widget placeholder
@@ -105,6 +114,62 @@ fun DataDenseDashboard(
                             )
                         }
                     }
+                }
+                
+                // News widget
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    NewsWidgetWithStatus(
+                        articles = uiState.newsArticles,
+                        isLoading = uiState.isNewsLoading,
+                        errorMessage = uiState.newsError,
+                        lastUpdated = uiState.newsLastUpdated,
+                        cacheLevel = uiState.newsLastUpdated?.let { 
+                            com.quantumslate.dashboard.data.local.CacheManager.getCacheLevel(it, 2 * 60 * 60 * 1000) 
+                        } ?: com.quantumslate.dashboard.data.local.CacheManager.CacheLevel.EXPIRED,
+                        onRefresh = { dashboardViewModel.refreshWidget(WidgetType.NEWS) },
+                        onArticleClick = { url -> /* Open URL */ },
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+                
+                // Flight status widget
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    FlightWidgetWithStatus(
+                        flights = uiState.flights,
+                        isLoading = uiState.isFlightsLoading,
+                        errorMessage = uiState.flightsError,
+                        lastUpdated = uiState.flightsLastUpdated,
+                        cacheLevel = uiState.flightsLastUpdated?.let { 
+                            com.quantumslate.dashboard.data.local.CacheManager.getCacheLevel(it, 5 * 60 * 1000) 
+                        } ?: com.quantumslate.dashboard.data.local.CacheManager.CacheLevel.EXPIRED,
+                        onRefresh = { dashboardViewModel.refreshWidget(WidgetType.FLIGHTS) },
+                        onAddFlight = { /* Add flight dialog */ },
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+                
+                // Spotify widget
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    SpotifyWidgetWithStatus(
+                        track = uiState.spotifyTrack,
+                        isLoading = uiState.isSpotifyLoading,
+                        errorMessage = uiState.spotifyError,
+                        lastUpdated = uiState.spotifyLastUpdated,
+                        cacheLevel = uiState.spotifyLastUpdated?.let { 
+                            com.quantumslate.dashboard.data.local.CacheManager.getCacheLevel(it, 30 * 1000) 
+                        } ?: com.quantumslate.dashboard.data.local.CacheManager.CacheLevel.EXPIRED,
+                        onRefresh = { dashboardViewModel.refreshWidget(WidgetType.SPOTIFY) },
+                        modifier = Modifier.padding(12.dp)
+                    )
                 }
             }
         }
