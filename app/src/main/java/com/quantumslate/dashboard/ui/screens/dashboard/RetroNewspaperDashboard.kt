@@ -159,16 +159,40 @@ fun RetroNewspaperDashboard(
                         }
                     }
 
-                    // Right column - Decorative border
+                    // Right column - Mascot and Social Calendar
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxSize(),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        // Mascot section
                         Box(
                             modifier = Modifier
-                                .fillMaxSize()
+                                .fillMaxWidth()
+                                .height(150.dp)
+                                .background(
+                                    MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
+                                    shape = MaterialTheme.shapes.small
+                                )
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val mascotViewModel: MascotViewModel = hiltViewModel()
+                            val mascotState by mascotViewModel.mascotState.collectAsState()
+                            
+                            LottieMascotWidget(
+                                mascotState = mascotState,
+                                size = 100f
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        // Social Calendar box
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
                                 .background(
                                     MaterialTheme.colorScheme.surface.copy(alpha = 0.3f),
                                     shape = MaterialTheme.shapes.small
@@ -184,7 +208,7 @@ fun RetroNewspaperDashboard(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text(
                                     text = "No events scheduled",
                                     style = MaterialTheme.typography.bodyMedium,
@@ -201,7 +225,7 @@ fun RetroNewspaperDashboard(
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.2f)
                 )
 
-                // Bottom section - Headlines placeholder
+                // Bottom section - Headlines from RSS News
                 Column {
                     Text(
                         text = "Latest Headlines",
@@ -211,12 +235,50 @@ fun RetroNewspaperDashboard(
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "News feed coming soon...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = FontFamily.Serif,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                    )
+                    
+                    val newsViewModel: NewsViewModel = hiltViewModel()
+                    val newsState by newsViewModel.newsState.collectAsState()
+                    
+                    if (newsState.isLoading) {
+                        Text(
+                            text = "Loading headlines...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontFamily = FontFamily.Serif,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        )
+                    } else if (newsState.error != null) {
+                        Text(
+                            text = "News unavailable",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontFamily = FontFamily.Serif,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else if (newsState.articles.isEmpty()) {
+                        Text(
+                            text = "No headlines available",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontFamily = FontFamily.Serif,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        )
+                    } else {
+                        // Display up to 3 headlines
+                        newsState.articles.take(3).forEach { article ->
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "• ${article.title}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontFamily = FontFamily.Serif,
+                                    color = MaterialTheme.colorScheme.onBackground,
+                                    maxLines = 2
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                        }
+                    }
                 }
             }
         }
