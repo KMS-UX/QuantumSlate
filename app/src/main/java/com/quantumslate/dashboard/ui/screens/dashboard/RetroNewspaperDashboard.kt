@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Divider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -167,6 +169,9 @@ fun RetroNewspaperDashboard(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         // Mascot section
+                        val dashboardViewModel: DashboardViewModel = hiltViewModel()
+                        val uiState by dashboardViewModel.uiState.collectAsState()
+                        
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -178,11 +183,12 @@ fun RetroNewspaperDashboard(
                                 .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            val mascotViewModel: MascotViewModel = hiltViewModel()
-                            val mascotState by mascotViewModel.mascotState.collectAsState()
-                            
                             LottieMascotWidget(
-                                mascotState = mascotState,
+                                mascotState = uiState.mascotState ?: com.quantumslate.dashboard.data.local.MascotStateEntity(
+                                    character = "robot",
+                                    mood = "neutral",
+                                    lastUpdated = System.currentTimeMillis()
+                                ),
                                 size = 100f
                             )
                         }
@@ -227,42 +233,73 @@ fun RetroNewspaperDashboard(
 
                 // Bottom section - Headlines from RSS News
                 Column {
-                    Text(
-                        text = "Latest Headlines",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontFamily = FontFamily.Serif,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
+                    val dashboardViewModel: DashboardViewModel = hiltViewModel()
+                    val uiState by dashboardViewModel.uiState.collectAsState()
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Latest Headlines",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontFamily = FontFamily.Serif,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        
+                        // Refresh button and cache status
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (uiState.newsLastUpdated != null) {
+                                StaleDataIndicator(
+                                    lastUpdated = uiState.newsLastUpdated!!,
+                                    cacheLevel = uiState.newsLastUpdated?.let { 
+                                        com.quantumslate.dashboard.data.local.CacheManager.getCacheLevel(it, 2 * 60 * 60 * 1000) 
+                                    } ?: com.quantumslate.dashboard.data.local.CacheManager.CacheLevel.EXPIRED
+                                )
+                            }
+                            
+                            IconButton(onClick = { dashboardViewModel.refreshWidget(WidgetType.NEWS) }) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Default.Refresh,
+                                    contentDescription = "Refresh News",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = androidx.compose.ui.Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                    
                     Spacer(modifier = Modifier.height(8.dp))
                     
-                    val newsViewModel: NewsViewModel = hiltViewModel()
-                    val newsState by newsViewModel.newsState.collectAsState()
-                    
-                    if (newsState.isLoading) {
+                    if (uiState.isNewsLoading) {
                         Text(
                             text = "Loading headlines...",
                             style = MaterialTheme.typography.bodyMedium,
                             fontFamily = FontFamily.Serif,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                         )
-                    } else if (newsState.error != null) {
+                    } else if (uiState.newsError != null && uiState.newsArticles.isEmpty()) {
                         Text(
-                            text = "News unavailable",
+                            text = "News unavailable: ${uiState.newsError}",
                             style = MaterialTheme.typography.bodyMedium,
                             fontFamily = FontFamily.Serif,
                             color = MaterialTheme.colorScheme.error
                         )
-                    } else if (newsState.articles.isEmpty()) {
+                    } else if (uiState.newsArticles.isEmpty()) {
                         Text(
-                            text = "No headlines available",
+                            text = "No headlines available. Add RSS feeds in settings.",
                             style = MaterialTheme.typography.bodyMedium,
                             fontFamily = FontFamily.Serif,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                         )
                     } else {
                         // Display up to 3 headlines
-                        newsState.articles.take(3).forEach { article ->
+                        uiState.newsArticles.take(3).forEach { article ->
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -275,6 +312,25 @@ fun RetroNewspaperDashboard(
                                     color = MaterialTheme.colorScheme.onBackground,
                                     maxLines = 2
                                 )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = article.source,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontFamily = FontFamily.Serif,
+                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                    )
+                                    article.publishedAt?.let { published ->
+                                        Text(
+                                            text = com.quantumslate.dashboard.data.local.CacheManager.getHumanReadableTime(published),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontFamily = FontFamily.Serif,
+                                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                                        )
+                                    }
+                                }
                                 Spacer(modifier = Modifier.height(4.dp))
                             }
                         }

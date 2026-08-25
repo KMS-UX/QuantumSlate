@@ -2,10 +2,13 @@ package com.quantumslate.dashboard.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -30,6 +33,9 @@ fun MinimalistDashboard(
             modifier = modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
+            val dashboardViewModel: DashboardViewModel = hiltViewModel()
+            val uiState by dashboardViewModel.uiState.collectAsState()
+            
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -37,21 +43,35 @@ fun MinimalistDashboard(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                val weatherViewModel: WeatherViewModel = hiltViewModel()
-                val weatherState by weatherViewModel.weatherState.collectAsState()
-
-                // Large time and date display
-                TimeDateWidget(
-                    modifier = Modifier.weight(1f)
-                )
+                // Large time and date display with refresh
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TimeDateWidget(
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    IconButton(onClick = { dashboardViewModel.refreshAll() }) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(48.dp))
 
-                // Weather widget below
-                WeatherWidget(
-                    weather = weatherState.weather,
-                    isLoading = weatherState.isLoading,
-                    errorMessage = weatherState.errorMessage
+                // Weather widget with cache status
+                WeatherWidgetWithStatus(
+                    weather = uiState.weather,
+                    isLoading = uiState.isWeatherLoading,
+                    errorMessage = uiState.weatherError,
+                    lastUpdated = uiState.weatherLastUpdated,
+                    cacheLevel = uiState.weatherLastUpdated?.let { 
+                        com.quantumslate.dashboard.data.local.CacheManager.getCacheLevel(it, 30 * 60 * 1000) 
+                    } ?: com.quantumslate.dashboard.data.local.CacheManager.CacheLevel.EXPIRED,
+                    onRefresh = { dashboardViewModel.refreshWidget(WidgetType.WEATHER) }
                 )
             }
         }
