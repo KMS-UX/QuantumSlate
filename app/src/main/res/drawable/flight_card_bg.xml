@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Flight Status Widget Card Background -->
+    
+    <!-- Light background with status-color border -->
+    <solid android:color="#FAFAFA" />
+    
+    <!-- Default gray border (can be overridden programmatically) -->
+    <stroke 
+        android:width="2dp" 
+        android:color="#9E9E9E" />
+    
+    <corners android:radius="6dp" />
+    
+    <padding 
+        android:left="12dp" 
+        android:top="12dp" 
+        android:right="12dp" 
+        android:bottom="12dp" />
+</shape>
