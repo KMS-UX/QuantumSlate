@@ -34,6 +34,53 @@ class CacheManager @Inject constructor(
     private val _cacheStatus = MutableStateFlow(CacheStatus(isLoading = true))
     val cacheStatus: StateFlow<CacheStatus> = _cacheStatus
     
+    private val _globalCacheStatus = MutableStateFlow<Map<String, CacheInfo>>(emptyMap())
+    val globalCacheStatus: StateFlow<Map<String, CacheInfo>> = _globalCacheStatus.asStateFlow()
+    
+    private val widgetTimestamps = mutableMapOf<String, Long>()
+    
+    /**
+     * Cache information for a specific widget
+     */
+    data class CacheInfo(
+        val lastUpdated: Long,
+        val level: CacheLevel,
+        val humanReadableTime: String
+    )
+    
+    /**
+     * Updates the timestamp for a specific widget
+     */
+    fun updateWidgetTimestamp(widgetKey: String, timestamp: Long = System.currentTimeMillis()) {
+        widgetTimestamps[widgetKey] = timestamp
+        updateGlobalCacheStatus()
+    }
+    
+    /**
+     * Gets the last update time for a widget
+     */
+    fun getLastUpdateTime(widgetKey: String): Long? {
+        return widgetTimestamps[widgetKey]
+    }
+    
+    /**
+     * Gets human-readable time since last update
+     */
+    fun getHumanReadableTime(timestamp: Long): String {
+        return getLastUpdatedString(timestamp)
+    }
+    
+    private fun updateGlobalCacheStatus() {
+        val statusMap = widgetTimestamps.mapValues { (key, timestamp) ->
+            CacheInfo(
+                lastUpdated = timestamp,
+                level = getCacheLevel(timestamp),
+                humanReadableTime = getHumanReadableTime(timestamp)
+            )
+        }
+        _globalCacheStatus.value = statusMap
+    }
+    
     /**
      * Checks if weather data is fresh based on timestamp.
      */

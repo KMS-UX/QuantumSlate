@@ -36,6 +36,32 @@ class NewsRepository @Inject constructor(
 ) {
     val newsArticles = newsDao.getNewsArticles().flowOn(Dispatchers.IO)
 
+    /**
+     * Fetch and cache news from all configured RSS feeds
+     */
+    suspend fun fetchAndCacheNews(): Result<List<com.quantumslate.dashboard.data.local.NewsArticleEntity>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val feedUrls = preferencesManager.getRssFeedUrls()
+                if (feedUrls.isEmpty()) {
+                    return@withContext Result.success(emptyList())
+                }
+                
+                var totalArticles = 0
+                feedUrls.forEach { feedUrl ->
+                    fetchAndCacheRssFeed(feedUrl).onSuccess { count ->
+                        totalArticles += count
+                    }
+                }
+                
+                val allArticles = getCachedNews()
+                Result.success(allArticles)
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+
     suspend fun fetchAndCacheRssFeed(feedUrl: String): Result<Int> {
         return withContext(Dispatchers.IO) {
             try {
@@ -159,6 +185,31 @@ class FlightRepository @Inject constructor(
     suspend fun getCachedFlights(): List<FlightEntity> {
         return withContext(Dispatchers.IO) {
             flightDao.getTrackedFlights().firstOrNull() ?: emptyList()
+        }
+    }
+    
+    /**
+     * Fetch status for all tracked flights
+     */
+    suspend fun fetchAllTrackedFlights(): Result<List<FlightEntity>> {
+        return withContext(Dispatchers.IO) {
+            try {
+                val tracked = getCachedFlights()
+                if (tracked.isEmpty()) {
+                    return@withContext Result.success(emptyList())
+                }
+                
+                // Fetch updates for all tracked flights
+                tracked.forEach { flight ->
+                    fetchAndCacheFlightStatus(flight.flightNumber).onSuccess { updated ->
+                        flightDao.insertFlight(updated)
+                    }
+                }
+                
+                Result.success(getCachedFlights())
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
         }
     }
 }
