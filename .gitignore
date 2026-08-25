@@ -4,37 +4,56 @@
 *.o
 *.obj
 *.out
-build/
-target/
+*.dll
+*.so
+*.a
+*.pyc
+__pycache__/
 
 # Dependencies
-.gradle/
-__pycache__/
-.mypy_cache/
-.pytest_cache/
 node_modules/
 venv/
 .venv/
+.gradle/
+.mypy_cache/
+.pytest_cache/
+target/
+build/
+dist/
 
-# Logs and temp files
-*.log
-*.tmp
-*.swp
+# Android specific
+*.apk
+*.aar
+*.dex
+local.properties
+.gradle/
+.proguard/
 
-# Environment
-.env
-.env.local
-*.env.*
-
-# Editors
+# IDE and editor files
 .vscode/
 .idea/
+*.swp
+*.swo
+*.tmp
+*.log
+*.iml
+*.iws
+*.ipr
 
 # System files
 .DS_Store
 Thumbs.db
+.DS_Store?
+ehthumbs.db
+Icon?
+desktop.ini
 
-# Coverage
+# Environment variables
+.env
+.env.local
+*.env.*
+
+# Coverage reports
 coverage/
 htmlcov/
 .coverage

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Decorative Corner Ornament for Newspaper Theme -->
+    
+    <!-- Main decorative element - corner flourish -->
+    <item android:right="40dp" android:bottom="40dp">
+        <shape android:shape="rectangle">
+            <solid android:color="#3E2723" />
+            <size android:width="3dp" android:height="3dp" />
+        </shape>
+    </item>
+    
+    <!-- Diagonal accent line -->
+    <item android:left="30dp" android:top="30dp">
+        <rotate 
+            android:fromDegrees="45"
+            android:pivotX="0%"
+            android:pivotY="0%">
+            <shape android:shape="rectangle">
+                <solid android:color="#5D4037" />
+                <size android:width="2dp" android:height="15dp" />
+            </shape>
+        </rotate>
+    </item>
+</layer-list>

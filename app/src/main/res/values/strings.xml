@@ -20,4 +20,38 @@
     <string name="enter_api_key">Enter your API key</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
+    
+    <!-- Mascot Characters -->
+    <string name="mascot_robot">Robot</string>
+    <string name="mascot_cat">Cat</string>
+    <string name="mascot_bird">Bird</string>
+    <string name="mascot_creature">Creature</string>
+    
+    <!-- Cache Status -->
+    <string name="cache_fresh">Just now</string>
+    <string name="cache_stale">%d min ago</string>
+    <string name="cache_expired">%d hours ago</string>
+    <string name="cache_very_old">Very old</string>
+    
+    <!-- Error Messages -->
+    <string name="retry">Retry</string>
+    <string name="offline_mode">Offline Mode</string>
+    <string name="data_stale">Data may be outdated</string>
+    
+    <!-- Settings -->
+    <string name="mascot_character">Mascot Character</string>
+    <string name="update_frequency">Update Frequency</string>
+    <string name="daily_mode">Daily</string>
+    <string name="ambient_mode">Ambient (30 min)</string>
+    <string name="realtime_mode">Real-time (5 min)</string>
+    <string name="weather_api_key">Weather API Key</string>
+    <string name="news_feed_url">News Feed URL</string>
+    <string name="tracked_flights">Tracked Flights</string>
+    <string name="spotify_enabled">Spotify Integration</string>
+    
+    <!-- Home Screen Widgets -->
+    <string name="widget_time_weather">Time & Weather</string>
+    <string name="widget_description_time_weather">Displays current time and weather conditions</string>
+    <string name="widget_refresh">Refresh widget data</string>
+    <string name="widget_tap_to_open">Tap to open dashboard</string>
 </resources>

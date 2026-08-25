@@ -47,6 +47,20 @@
                 android:value="androidx.startup" />
         </provider>
 
+        <!-- Time & Weather Home Screen Widget -->
+        <receiver
+            android:name=".widget.TimeWeatherWidget"
+            android:exported="true"
+            android:label="@string/widget_time_weather">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.quantumslate.dashboard.REFRESH_WIDGET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/time_weather_widget_info" />
+        </receiver>
+
     </application>
 
 </manifest>

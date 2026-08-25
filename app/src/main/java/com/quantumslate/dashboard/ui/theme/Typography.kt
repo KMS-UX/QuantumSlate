@@ -5,6 +5,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.quantumslate.dashboard.R
 
 // Default Material 3 Typography
 val Typography = Typography(
@@ -42,9 +43,10 @@ val MinimalistTypography = Typography(
     )
 )
 
-// Retro Newspaper Theme Typography - Serif fonts
+// Retro Newspaper Theme Typography - Vintage serif fonts
 val RetroTypography = Typography(
     displayLarge = TextStyle(
+        // Will use custom font when available: R.font.old_standard_tt_bold
         fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.Bold,
         fontSize = 42.sp,
@@ -60,11 +62,27 @@ val RetroTypography = Typography(
         fontWeight = FontWeight.Bold,
         fontSize = 24.sp
     ),
+    titleLarge = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 20.sp
+    ),
     bodyLarge = TextStyle(
         fontFamily = FontFamily.Serif,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 22.sp
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 14.sp,
+        lineHeight = 20.sp
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.Serif,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp
     )
 )
 
