@@ -48,4 +48,10 @@
     <string name="news_feed_url">News Feed URL</string>
     <string name="tracked_flights">Tracked Flights</string>
     <string name="spotify_enabled">Spotify Integration</string>
+    
+    <!-- Home Screen Widgets -->
+    <string name="widget_time_weather">Time & Weather</string>
+    <string name="widget_description_time_weather">Displays current time and weather conditions</string>
+    <string name="widget_refresh">Refresh widget data</string>
+    <string name="widget_tap_to_open">Tap to open dashboard</string>
 </resources>
