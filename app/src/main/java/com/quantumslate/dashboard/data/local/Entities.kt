@@ -12,7 +12,9 @@ data class WeatherEntity(
     val lowTemp: Double,
     val location: String,
     val timestamp: Long,
-    val iconUrl: String? = null
+    val iconUrl: String? = null,
+    val humidity: Int = 0,
+    val windSpeed: Double = 0.0
 )
 
 @Entity(tableName = "calendar_event")

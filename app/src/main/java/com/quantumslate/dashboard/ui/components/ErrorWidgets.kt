@@ -221,6 +221,7 @@ fun WidgetStateHandler(
     errorMessage: String?,
     isEmpty: Boolean,
     emptyMessage: String = "No data available",
+    loadingMessage: String = "Loading...",
     cacheAgeDisplay: CacheAgeDisplay? = null,
     onRetry: () -> Unit,
     onRefresh: (() -> Unit)? = null,
@@ -229,7 +230,7 @@ fun WidgetStateHandler(
 ) {
     when {
         isLoading -> {
-            WidgetLoadingIndicator()
+            WidgetLoadingIndicator(message = loadingMessage)
         }
         hasError && errorMessage != null -> {
             ErrorStateWidget(

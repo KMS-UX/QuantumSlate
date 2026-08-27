@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -22,13 +24,44 @@ android {
         }
     }
 
+    /**
+     * Release signing is read from a gitignored keystore.properties so no credential ever
+     * enters the repository. Absent that file, `assembleRelease` still builds — it just
+     * produces an unsigned APK rather than failing the whole build.
+     */
+    val keystorePropertiesFile = rootProject.file("keystore.properties")
+    val keystoreProperties = Properties().apply {
+        if (keystorePropertiesFile.exists()) {
+            keystorePropertiesFile.inputStream().use { load(it) }
+        }
+    }
+
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (keystorePropertiesFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+        debug {
+            // Keep debug builds fast and fully debuggable.
+            isMinifyEnabled = false
         }
     }
     compileOptions {
@@ -40,6 +73,8 @@ android {
     }
     buildFeatures {
         compose = true
+        // Needed for the debug-only network logging guard in NetworkModule.
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.4"
@@ -63,6 +98,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3:1.2.0")
+    implementation("androidx.compose.material:material-icons-extended")
+    // Material 2, for pull-to-refresh: material3 1.2.0 has no equivalent yet.
+    // Already present transitively, so this adds nothing to the APK.
+    implementation("androidx.compose.material:material")
 
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.6")
@@ -93,8 +132,9 @@ dependencies {
     // Image Loading
     implementation("io.coil-kt:coil-compose:2.5.0")
 
-    // Lottie Animations (for mascot)
-    implementation("com.airbnb.android:lottie-compose:6.3.0")
+    // Custom Tabs, for the Spotify OAuth consent page. Keeps the user's Spotify
+    // credentials in the system browser rather than in an in-app WebView.
+    implementation("androidx.browser:browser:1.7.0")
 
     // RSS Parsing
     implementation("com.rometools:rome:2.1.0")
@@ -105,6 +145,8 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("com.google.truth:truth:1.1.5")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.01.00"))

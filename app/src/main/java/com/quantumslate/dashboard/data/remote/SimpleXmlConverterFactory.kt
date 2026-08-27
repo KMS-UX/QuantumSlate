@@ -4,6 +4,7 @@ import okhttp3.ResponseBody
 import org.w3c.dom.Document
 import retrofit2.Converter
 import retrofit2.Retrofit
+import java.lang.reflect.Type
 import java.io.StringReader
 import javax.xml.parsers.DocumentBuilderFactory
 
@@ -18,7 +19,7 @@ class SimpleXmlConverterFactory private constructor() : Converter.Factory() {
     }
 
     override fun responseBodyConverter(
-        type: Class<*>,
+        type: Type,
         annotations: Array<out Annotation>,
         retrofit: Retrofit
     ): Converter<ResponseBody, *>? {

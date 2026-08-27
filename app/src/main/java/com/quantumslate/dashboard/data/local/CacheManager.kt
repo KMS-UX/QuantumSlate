@@ -3,8 +3,10 @@ package com.quantumslate.dashboard.data.local
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import java.util.concurrent.TimeUnit
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -14,7 +16,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class CacheManager @Inject constructor(
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) {
     companion object {
         // Cache expiration thresholds
@@ -182,6 +184,22 @@ class CacheManager @Inject constructor(
             hasError = hasError,
             errorMessage = errorMessage
         )
+    }
+}
+
+/**
+ * Freshness of [timestamp] against an explicit max age.
+ *
+ * Stateless counterpart to [CacheManager.getCacheLevel], for UI call sites that have
+ * no CacheManager instance to hand.
+ */
+fun cacheLevelFor(timestamp: Long, maxAgeMs: Long): CacheLevel {
+    val age = System.currentTimeMillis() - timestamp
+    return when {
+        age < maxAgeMs * 0.25 -> CacheLevel.FRESH
+        age < maxAgeMs * 0.5 -> CacheLevel.STALE
+        age < maxAgeMs -> CacheLevel.EXPIRED
+        else -> CacheLevel.VERY_OLD
     }
 }
 

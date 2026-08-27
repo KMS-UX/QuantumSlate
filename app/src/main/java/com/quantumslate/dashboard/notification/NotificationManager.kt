@@ -1,6 +1,7 @@
 package com.quantumslate.dashboard.notification
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -125,6 +126,21 @@ class NotificationManager(private val context: Context) {
     }
 
     /**
+     * Posts a notification, honouring the Android 13+ runtime permission.
+     *
+     * Silently drops the notification when the user has not granted POST_NOTIFICATIONS;
+     * a missing notification is never worth crashing the background sync over.
+     */
+    private fun postNotification(notificationId: Int, notification: Notification) {
+        if (!hasNotificationPermission()) return
+        try {
+            NotificationManagerCompat.from(context).notify(notificationId, notification)
+        } catch (e: SecurityException) {
+            // Permission revoked between the check and the post.
+        }
+    }
+
+    /**
      * Show flight delay notification
      */
     fun showFlightDelayNotification(
@@ -154,7 +170,7 @@ class NotificationManager(private val context: Context) {
             .setContentIntent(pendingIntent)
             .build()
 
-        NotificationManagerCompat.notify(context, NOTIFICATION_FLIGHT_DELAY, notification)
+        postNotification(NOTIFICATION_FLIGHT_DELAY, notification)
     }
 
     /**
@@ -186,7 +202,7 @@ class NotificationManager(private val context: Context) {
             .setContentIntent(pendingIntent)
             .build()
 
-        NotificationManagerCompat.notify(context, NOTIFICATION_FLIGHT_STATUS, notification)
+        postNotification(NOTIFICATION_FLIGHT_STATUS, notification)
     }
 
     /**
@@ -213,12 +229,12 @@ class NotificationManager(private val context: Context) {
             .setContentTitle("Weather Alert: $alertType")
             .setContentText("$severity - $description")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_WEATHER)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
 
-        NotificationManagerCompat.notify(context, NOTIFICATION_WEATHER_WARNING, notification)
+        postNotification(NOTIFICATION_WEATHER_WARNING, notification)
     }
 
     /**
@@ -242,12 +258,12 @@ class NotificationManager(private val context: Context) {
             .setContentText(headline)
             .setSubText(source)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setCategory(NotificationCompat.CATEGORY_NEWS)
+            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
 
-        NotificationManagerCompat.notify(context, NOTIFICATION_BREAKING_NEWS, notification)
+        postNotification(NOTIFICATION_BREAKING_NEWS, notification)
     }
 
     /**
@@ -274,7 +290,7 @@ class NotificationManager(private val context: Context) {
             .setContentIntent(pendingIntent)
             .build()
 
-        NotificationManagerCompat.notify(context, NOTIFICATION_SYNC_ERROR, notification)
+        postNotification(NOTIFICATION_SYNC_ERROR, notification)
     }
 
     /**
@@ -290,20 +306,20 @@ class NotificationManager(private val context: Context) {
             .setOngoing(true)
             .build()
 
-        NotificationManagerCompat.notify(context, NOTIFICATION_OFFLINE_MODE, notification)
+        postNotification(NOTIFICATION_OFFLINE_MODE, notification)
     }
 
     /**
      * Cancel a specific notification
      */
     fun cancelNotification(notificationId: Int) {
-        NotificationManagerCompat.cancel(context, notificationId)
+        NotificationManagerCompat.from(context).cancel(notificationId)
     }
 
     /**
      * Cancel all notifications from this app
      */
     fun cancelAllNotifications() {
-        NotificationManagerCompat.cancelAll(context)
+        NotificationManagerCompat.from(context).cancelAll()
     }
 }

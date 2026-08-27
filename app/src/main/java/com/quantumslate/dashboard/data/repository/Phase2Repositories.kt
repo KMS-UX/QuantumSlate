@@ -3,6 +3,7 @@ package com.quantumslate.dashboard.data.repository
 import android.content.Context
 import com.quantumslate.dashboard.data.local.FlightDao
 import com.quantumslate.dashboard.data.local.MascotStateDao
+import com.quantumslate.dashboard.data.local.MascotStateEntity
 import com.quantumslate.dashboard.data.local.NewsDao
 import com.quantumslate.dashboard.data.local.PreferencesManager
 import com.quantumslate.dashboard.data.local.SpotifyDao
@@ -10,15 +11,24 @@ import com.quantumslate.dashboard.data.local.SpotifyTrackEntity
 import com.quantumslate.dashboard.data.remote.ApiClient
 import com.quantumslate.dashboard.data.remote.FlightEntry
 import com.quantumslate.dashboard.data.remote.FlightStatusResponse
+import com.quantumslate.dashboard.data.remote.flight.FlightAuthFailed
+import com.quantumslate.dashboard.data.remote.flight.FlightDataSource
+import com.quantumslate.dashboard.data.remote.flight.FlightNotFound
+import com.quantumslate.dashboard.data.remote.flight.FlightPollingPolicy
+import com.quantumslate.dashboard.data.remote.flight.FlightQuotaExhausted
+import com.quantumslate.dashboard.data.remote.flight.FlightRequestBudget
+import com.quantumslate.dashboard.data.remote.spotify.SpotifyAuthManager
 import com.quantumslate.dashboard.data.local.FlightEntity
 import com.quantumslate.dashboard.domain.model.MascotMood
 import com.quantumslate.dashboard.domain.model.MascotState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import org.w3c.dom.Document
+import org.w3c.dom.Element
 import org.xml.sax.InputSource
 import java.io.StringReader
 import java.text.SimpleDateFormat
@@ -42,7 +52,7 @@ class NewsRepository @Inject constructor(
     suspend fun fetchAndCacheNews(): Result<List<com.quantumslate.dashboard.data.local.NewsArticleEntity>> {
         return withContext(Dispatchers.IO) {
             try {
-                val feedUrls = preferencesManager.getRssFeedUrls()
+                val feedUrls = preferencesManager.getRssFeeds()
                 if (feedUrls.isEmpty()) {
                     return@withContext Result.success(emptyList())
                 }
@@ -91,7 +101,7 @@ class NewsRepository @Inject constructor(
             val items = document.getElementsByTagName("item")
             
             for (i in 0 until minOf(items.length, 10)) {
-                val item = items.item(i)
+                val item = items.item(i) as? Element ?: continue
                 val titleNodes = item.getElementsByTagName("title")
                 val linkNodes = item.getElementsByTagName("link")
                 val descNodes = item.getElementsByTagName("description")
@@ -144,35 +154,65 @@ class NewsRepository @Inject constructor(
 @Singleton
 class FlightRepository @Inject constructor(
     private val flightDao: FlightDao,
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val dataSource: FlightDataSource,
+    private val requestBudget: FlightRequestBudget
 ) {
     val trackedFlights: Flow<List<FlightEntity>> = flightDao.getTrackedFlights().flowOn(Dispatchers.IO)
 
-    suspend fun fetchAndCacheFlightStatus(flightNumber: String): Result<FlightEntity> {
-        return withContext(Dispatchers.IO) {
-            try {
-                val apiKey = preferencesManager.getFlightApiKey()
-                if (apiKey.isNullOrBlank()) {
-                    return@withContext Result.failure(Exception("Flight API key not configured"))
-                }
+    /** Requests left in this month's allowance, or null if the provider publishes no limit. */
+    fun remainingRequests(): Int? = requestBudget.remaining(dataSource.freeTierMonthlyRequests)
 
-                // Use AviationEdge by default
-                val apiService = ApiClient.getFlightApiService(com.quantumslate.dashboard.data.remote.FlightApiService.BASE_URL_AVIATION_EDGE)
-                val response = apiService.getFlightStatus(flightNumber, apiKey)
-                
-                val flightEntity = response.toFlightEntity(flightNumber, apiKey)
-                flightDao.insertFlight(flightEntity)
-                
-                Result.success(flightEntity)
-            } catch (e: Exception) {
-                Result.failure(e)
+    /**
+     * Fetches one flight, spending a request from the budget.
+     *
+     * [force] bypasses the polling interval (used for an explicit pull-to-refresh) but never
+     * bypasses the budget — the quota is a hard ceiling regardless of who asked.
+     */
+    suspend fun fetchAndCacheFlightStatus(
+        flightNumber: String,
+        force: Boolean = false
+    ): Result<FlightEntity> {
+        return withContext(Dispatchers.IO) {
+            val apiKey = preferencesManager.getFlightApiKey()
+            if (apiKey.isNullOrBlank()) {
+                return@withContext Result.failure(Exception("Flight API key not configured"))
             }
+
+            val cached = flightDao.getFlightOnce(flightNumber)
+
+            // Skip the request entirely when the policy says nothing can have changed.
+            if (!force && !FlightPollingPolicy.shouldPoll(cached)) {
+                return@withContext cached?.let { Result.success(it) }
+                    ?: Result.failure(Exception("No cached data for $flightNumber"))
+            }
+
+            if (!requestBudget.canSpend(dataSource.freeTierMonthlyRequests)) {
+                // Serve stale data rather than failing outright: an old departure time is
+                // more useful than an error, and the widget marks staleness already.
+                return@withContext cached?.let { Result.success(it) }
+                    ?: Result.failure(
+                        FlightQuotaExhausted(
+                            "Monthly flight request allowance used up for ${dataSource.displayName}"
+                        )
+                    )
+            }
+
+            requestBudget.record()
+            dataSource.fetchFlight(flightNumber, apiKey)
+                .onSuccess { flightDao.insertFlight(it) }
+                .recoverCatching { error ->
+                    // Fall back to cache for transient failures; propagate the ones that
+                    // retrying cannot fix so the UI can tell the user something actionable.
+                    if (error is FlightAuthFailed || error is FlightNotFound) throw error
+                    cached ?: throw error
+                }
         }
     }
 
     suspend fun trackFlight(flightNumber: String) {
         withContext(Dispatchers.IO) {
-            fetchAndCacheFlightStatus(flightNumber)
+            fetchAndCacheFlightStatus(flightNumber, force = true)
         }
     }
 
@@ -187,25 +227,23 @@ class FlightRepository @Inject constructor(
             flightDao.getTrackedFlights().firstOrNull() ?: emptyList()
         }
     }
-    
+
     /**
-     * Fetch status for all tracked flights
+     * Refreshes every flight the user tracks, honouring the polling policy per flight.
+     *
+     * Reads the tracked list from preferences rather than from the flight table, so a flight
+     * the user just added — and which therefore has no cached row yet — is still fetched.
      */
-    suspend fun fetchAllTrackedFlights(): Result<List<FlightEntity>> {
+    suspend fun fetchAllTrackedFlights(force: Boolean = false): Result<List<FlightEntity>> {
         return withContext(Dispatchers.IO) {
             try {
-                val tracked = getCachedFlights()
-                if (tracked.isEmpty()) {
-                    return@withContext Result.success(emptyList())
+                val tracked = preferencesManager.getTrackedFlights()
+                if (tracked.isEmpty()) return@withContext Result.success(emptyList())
+
+                tracked.forEach { flightNumber ->
+                    fetchAndCacheFlightStatus(flightNumber, force = force)
                 }
-                
-                // Fetch updates for all tracked flights
-                tracked.forEach { flight ->
-                    fetchAndCacheFlightStatus(flight.flightNumber).onSuccess { updated ->
-                        flightDao.insertFlight(updated)
-                    }
-                }
-                
+
                 Result.success(getCachedFlights())
             } catch (e: Exception) {
                 Result.failure(e)
@@ -214,67 +252,31 @@ class FlightRepository @Inject constructor(
     }
 }
 
-private fun FlightStatusResponse.toFlightEntity(flightNumber: String, apiKey: String): FlightEntity {
-    val now = System.currentTimeMillis()
-    
-    // Parse times - AviationEdge returns ISO format strings
-    val scheduledDep = departure?.scheduledTime?.let { parseIsoTime(it) } ?: now
-    val scheduledArr = arrival?.scheduledTime?.let { parseIsoTime(it) } ?: now
-    val estimatedDep = departure?.estimatedTime?.let { parseIsoTime(it) }
-    val estimatedArr = arrival?.estimatedTime?.let { parseIsoTime(it) }
-    
-    return FlightEntity(
-        flightNumber = flightNumber,
-        airline = airline?.name ?: "Unknown Airline",
-        departureAirport = departure?.name ?: departure?.code?.iata ?: "Unknown",
-        arrivalAirport = arrival?.name ?: arrival?.code?.iata ?: "Unknown",
-        scheduledDeparture = scheduledDep,
-        scheduledArrival = scheduledArr,
-        estimatedDeparture = estimatedDep,
-        estimatedArrival = estimatedArr,
-        status = status ?: "Unknown",
-        gate = departure?.gate,
-        terminal = departure?.terminal,
-        timestamp = now
-    )
-}
-
-private fun parseIsoTime(isoString: String): Long {
-    return try {
-        val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.ENGLISH)
-        format.timeZone = TimeZone.getTimeZone("UTC")
-        format.parse(isoString)?.time ?: System.currentTimeMillis()
-    } catch (e: Exception) {
-        System.currentTimeMillis()
-    }
-}
-
-// ==================== SPOTIFY REPOSITORY ====================
-
 @Singleton
 class SpotifyRepository @Inject constructor(
     private val spotifyDao: SpotifyDao,
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val spotifyAuthManager: SpotifyAuthManager
 ) {
     val currentTrack: Flow<SpotifyTrackEntity?> = spotifyDao.getCurrentTrack().flowOn(Dispatchers.IO)
 
     suspend fun fetchAndCachePlayback(): Result<SpotifyTrackEntity?> {
         return withContext(Dispatchers.IO) {
             try {
-                val token = preferencesManager.getSpotifyAccessToken()
+                val token = spotifyAuthManager.getValidAccessToken()
                 if (token.isNullOrBlank()) {
-                    return@withContext Result.failure(Exception("Spotify not authenticated"))
+                    return@withContext Result.failure(
+                        Exception("Spotify not connected. Connect it in Settings.")
+                    )
                 }
 
                 val apiService = ApiClient.getSpotifyApiService()
-                val response = try {
-                    apiService.getCurrentPlayback("Bearer $token")
+                val trackEntity = try {
+                    apiService.getCurrentPlayback("Bearer $token").toSpotifyTrackEntity(token)
                 } catch (e: Exception) {
                     // Try fallback endpoint
-                    apiService.getCurrentlyPlaying("Bearer $token")
+                    apiService.getCurrentlyPlaying("Bearer $token").toSpotifyTrackEntity(token)
                 }
-
-                val trackEntity = response.toSpotifyTrackEntity(token)
                 if (trackEntity != null) {
                     spotifyDao.insertTrack(trackEntity)
                 }
@@ -402,15 +404,27 @@ class MascotRepository @Inject constructor(
         return mood
     }
 
+    /**
+     * Names the Quantum Boy pose a mood resolves to.
+     *
+     * The renderer selects its drawable from the mood itself, so this value is descriptive
+     * rather than load-bearing — it is what shows up in diagnostics and cached state.
+     */
     private fun determineAnimation(mood: MascotMood, animationsEnabled: Boolean): String {
-        if (!animationsEnabled) return "idle_static"
-        
-        return when (mood) {
+        val pose = when (mood) {
             MascotMood.HAPPY -> "happy_wave"
-            MascotMood.EXCITED -> "dancing"
-            MascotMood.CONCERNED -> "worried_look"
-            MascotMood.SLEEPY -> "sleeping"
-            MascotMood.NEUTRAL -> "idle_breathing"
+            MascotMood.EXCITED -> "excited_peak_spread"
+            MascotMood.CONCERNED -> "concerned_shoulders_drop"
+            MascotMood.SLEEPY -> "sleepy_progression"
+            MascotMood.NEUTRAL -> "neutral_ready_stance"
+        }
+        return if (animationsEnabled) pose else "${pose}_static"
+    }
+
+    /** Persists an already-computed mascot state (e.g. a mood recalculated in the UI layer). */
+    suspend fun updateMascotState(state: MascotStateEntity) {
+        withContext(Dispatchers.IO) {
+            mascotDao.saveMascotState(state)
         }
     }
 

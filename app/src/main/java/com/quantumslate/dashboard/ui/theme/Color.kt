@@ -2,13 +2,6 @@ package com.quantumslate.dashboard.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
-
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
 
 // Minimalist Theme Colors
 val MinimalistBackground = Color(0xFFFFFFFF)
@@ -38,3 +31,43 @@ val DataDensePrimary = Color(0xFF1976D2)
 val DataDenseSecondary = Color(0xFF388E3C)
 val DataDenseWarning = Color(0xFFF57C00)
 val DataDenseError = Color(0xFFD32F2F)
+
+// ==================== QuantumEffect Theme Colors ====================
+//
+// Ported verbatim from the Quantum Effect Design System's `tokens/colors.css`
+// (project 2d830ed5-c3ae-4368-91f3-19902e2737a7) so this mode matches the game's
+// own palette rather than an invented approximation.
+
+// Base surfaces — near-black blue-violet void
+val QeVoid0 = Color(0xFF04060D)
+val QeVoid1 = Color(0xFF070B16)
+val QeVoid2 = Color(0xFF0B1020)
+val QeVoid3 = Color(0xFF101729)
+val QeVoid4 = Color(0xFF161F36)
+
+// Foreground
+val QeFg1 = Color(0xFFE8ECF4)
+val QeFg2 = Color(0xFF9AA6BD)
+val QeFg3 = Color(0xFF5D6A85)
+
+// Accents
+val QeQuantumPurple = Color(0xFFA855F7)
+val QeTeal = Color(0xFF2DD4CF)
+val QeElectricBlue = Color(0xFF4F83F7)
+val QeAtomGold = Color(0xFFF0B429)
+val QeAlertRed = Color(0xFFE5484D)
+val QeSuccessGreen = Color(0xFF7EDE4E)
+val QeEmberOrange = Color(0xFFF07F2E)
+
+// Borders
+val QeBorderPanel = Color(0xFF1D2740)
+val QeBorderBright = Color(0xFF2E3D63)
+
+// Stat bars
+val QeBarTrack = Color(0xFF0A0E1A)
+val QeBarHp = Color(0xFFE5484D)
+val QeBarHpHi = Color(0xFFFF7A45)
+val QeBarEp = Color(0xFF2B5CD9)
+val QeBarEpHi = Color(0xFF38C8F0)
+val QeBarXp = Color(0xFFC78A12)
+val QeBarXpHi = Color(0xFFF0B429)

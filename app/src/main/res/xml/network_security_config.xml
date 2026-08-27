@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+        Bible §12 requires HTTPS for all API calls, and this config keeps that as the default
+        for every host.
+
+        The single exception is api.aviationstack.com: aviationstack gates HTTPS behind its
+        paid plans, so the free tier is reachable over cleartext HTTP only. Without this
+        exception the flight widget cannot work at all on a free key.
+
+        Scope is deliberately one host. Remove this block if the account is upgraded to a
+        paid aviationstack plan, or if the app switches to a provider that serves TLS on its
+        free tier.
+    -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">api.aviationstack.com</domain>
+    </domain-config>
+</network-security-config>

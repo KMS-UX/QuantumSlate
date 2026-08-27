@@ -2,12 +2,18 @@ package com.quantumslate.dashboard.ui.components
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.quantumslate.dashboard.data.local.CacheExpiry
 import com.quantumslate.dashboard.data.local.CacheManager
+import com.quantumslate.dashboard.data.local.CalendarEventEntity
+import com.quantumslate.dashboard.data.local.DashboardWidget
+import com.quantumslate.dashboard.data.local.WidgetLayout
 import com.quantumslate.dashboard.data.local.FlightEntity
 import com.quantumslate.dashboard.data.local.MascotStateEntity
 import com.quantumslate.dashboard.data.local.NewsArticleEntity
+import com.quantumslate.dashboard.data.local.CacheLevel
 import com.quantumslate.dashboard.data.local.PreferencesManager
 import com.quantumslate.dashboard.data.local.SpotifyTrackEntity
+import com.quantumslate.dashboard.data.repository.CalendarRepository
 import com.quantumslate.dashboard.data.repository.FlightRepository
 import com.quantumslate.dashboard.data.repository.MascotRepository
 import com.quantumslate.dashboard.data.repository.NewsRepository
@@ -50,8 +56,25 @@ data class DashboardUiState(
     val spotifyError: String? = null,
     val spotifyLastUpdated: Long? = null,
     
+    // Calendar
+    val calendarEvents: List<CalendarEventEntity> = emptyList(),
+    val isCalendarLoading: Boolean = false,
+    val calendarError: String? = null,
+    val calendarLastUpdated: Long? = null,
+    val calendarPermissionMissing: Boolean = false,
+
+    // Flight request allowance
+    val flightRequestsRemaining: Int? = null,
+
     // Mascot
     val mascotState: MascotStateEntity? = null,
+    val mascotAnimationsEnabled: Boolean = true,
+
+    // Appearance
+    val darkMode: PreferencesManager.DarkMode = PreferencesManager.DarkMode.AUTO,
+
+    // Which widgets are shown, and in what order (Bible §5)
+    val widgetLayout: WidgetLayout = WidgetLayout(),
     
     // Global
     val isRefreshing: Boolean = false
@@ -59,7 +82,7 @@ data class DashboardUiState(
     /**
      * Calculate overall data freshness status
      */
-    fun getOverallFreshness(cacheManager: CacheManager): CacheManager.CacheLevel {
+    fun getOverallFreshness(cacheManager: CacheManager): CacheLevel {
         val timestamps = listOfNotNull(
             weatherLastUpdated,
             newsLastUpdated,
@@ -67,16 +90,16 @@ data class DashboardUiState(
             spotifyLastUpdated
         )
         
-        if (timestamps.isEmpty()) return CacheManager.CacheLevel.EXPIRED
+        if (timestamps.isEmpty()) return CacheLevel.EXPIRED
         
-        val oldestTimestamp = timestamps.minOrNull() ?: return CacheManager.CacheLevel.EXPIRED
+        val oldestTimestamp = timestamps.minOrNull() ?: return CacheLevel.EXPIRED
         val ageMs = System.currentTimeMillis() - oldestTimestamp
         
         return when {
-            ageMs < 5 * 60 * 1000 -> CacheManager.CacheLevel.FRESH      // < 5 min
-            ageMs < 30 * 60 * 1000 -> CacheManager.CacheLevel.STALE     // < 30 min
-            ageMs < 2 * 60 * 60 * 1000 -> CacheManager.CacheLevel.EXPIRED // < 2 hours
-            else -> CacheManager.CacheLevel.VERY_OLD                    // > 2 hours
+            ageMs < 5 * 60 * 1000 -> CacheLevel.FRESH      // < 5 min
+            ageMs < 30 * 60 * 1000 -> CacheLevel.STALE     // < 30 min
+            ageMs < 2 * 60 * 60 * 1000 -> CacheLevel.EXPIRED // < 2 hours
+            else -> CacheLevel.VERY_OLD                    // > 2 hours
         }
     }
 }
@@ -87,6 +110,8 @@ class DashboardViewModel @Inject constructor(
     private val newsRepository: NewsRepository,
     private val flightRepository: FlightRepository,
     private val spotifyRepository: SpotifyRepository,
+    private val calendarRepository: CalendarRepository,
+    private val cacheExpiry: CacheExpiry,
     private val mascotRepository: MascotRepository,
     private val preferencesManager: PreferencesManager,
     private val cacheManager: CacheManager
@@ -99,6 +124,11 @@ class DashboardViewModel @Inject constructor(
     val cacheStatus: StateFlow<Map<String, CacheManager.CacheInfo>> = _cacheStatus.asStateFlow()
 
     init {
+        _uiState.value = _uiState.value.copy(
+            darkMode = preferencesManager.getDarkMode(),
+            widgetLayout = preferencesManager.getWidgetLayout()
+        )
+        viewModelScope.launch { cacheExpiry.purgeExpired() }
         loadAllData()
         observeCacheStatus()
         updateMascotMood()
@@ -111,15 +141,15 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isRefreshing = true)
             
-            // Launch all data loads in parallel
-            listOf(
-                async { loadWeather() },
-                async { loadNews() },
-                async { loadFlights() },
-                async { loadSpotify() },
-                async { loadMascot() }
-            ).forEach { it.await() }
-            
+            // Each loader launches its own coroutine and tracks its own loading flag,
+            // so these all run concurrently.
+            loadWeather()
+            loadNews()
+            loadCalendar()
+            loadFlights()
+            loadSpotify()
+            loadMascot()
+
             _uiState.value = _uiState.value.copy(isRefreshing = false)
         }
     }
@@ -130,8 +160,9 @@ class DashboardViewModel @Inject constructor(
     fun refreshWidget(widgetType: WidgetType) {
         when (widgetType) {
             WidgetType.WEATHER -> loadWeather()
+            WidgetType.CALENDAR -> loadCalendar()
             WidgetType.NEWS -> loadNews()
-            WidgetType.FLIGHTS -> loadFlights()
+            WidgetType.FLIGHTS -> loadFlights(force = true)
             WidgetType.SPOTIFY -> loadSpotify()
             WidgetType.MASCOT -> loadMascot()
         }
@@ -152,7 +183,7 @@ class DashboardViewModel @Inject constructor(
             
             try {
                 val location = preferencesManager.getLocation()
-                val result = if (location.isNotEmpty()) {
+                val result = if (!location.isNullOrEmpty()) {
                     weatherRepository.fetchWeatherByLocationName(location)
                 } else {
                     weatherRepository.fetchAndCacheWeather(40.7128, -74.0060) // Default: NYC
@@ -220,18 +251,19 @@ class DashboardViewModel @Inject constructor(
 
     // ==================== FLIGHTS ====================
 
-    private fun loadFlights() {
+    private fun loadFlights(force: Boolean = false) {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isFlightsLoading = true)
             
             try {
-                val result = flightRepository.fetchAllTrackedFlights()
+                val result = flightRepository.fetchAllTrackedFlights(force = force)
                 result.onSuccess { flights ->
                     _uiState.value = _uiState.value.copy(
                         flights = flights,
                         isFlightsLoading = false,
                         flightsError = null,
-                        flightsLastUpdated = System.currentTimeMillis()
+                        flightsLastUpdated = System.currentTimeMillis(),
+                        flightRequestsRemaining = flightRepository.remainingRequests()
                     )
                     updateMascotMood()
                 }.onFailure { error ->
@@ -262,7 +294,7 @@ class DashboardViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isSpotifyLoading = true)
             
             try {
-                val result = spotifyRepository.getCurrentTrack()
+                val result = spotifyRepository.fetchAndCachePlayback()
                 result.onSuccess { track ->
                     _uiState.value = _uiState.value.copy(
                         spotifyTrack = track,
@@ -292,20 +324,131 @@ class DashboardViewModel @Inject constructor(
         }
     }
 
+    // ==================== TRACKED ITEMS ====================
+
+    /** Flight numbers the user has chosen to track (Bible §5). */
+    val trackedFlights: List<String>
+        get() = preferencesManager.getTrackedFlights()
+
+    /** RSS/Atom feed URLs the user has configured. */
+    val rssFeeds: List<String>
+        get() = preferencesManager.getRssFeeds()
+
+    fun addTrackedFlight(flightNumber: String) {
+        viewModelScope.launch {
+            val current = preferencesManager.getTrackedFlights()
+            if (flightNumber.isBlank() || current.any { it.equals(flightNumber, true) }) return@launch
+            // Bible §2E tracks 1-2 flights; keep the most recent two so the free-tier
+            // request budget stays predictable.
+            preferencesManager.saveTrackedFlights((current + flightNumber).takeLast(2))
+            loadFlights()
+        }
+    }
+
+    fun removeTrackedFlight(flightNumber: String) {
+        viewModelScope.launch {
+            preferencesManager.saveTrackedFlights(
+                preferencesManager.getTrackedFlights().filterNot { it.equals(flightNumber, true) }
+            )
+            loadFlights()
+        }
+    }
+
+    fun addRssFeed(url: String) {
+        viewModelScope.launch {
+            val current = preferencesManager.getRssFeeds()
+            if (url.isBlank() || url in current) return@launch
+            preferencesManager.saveRssFeeds(current + url)
+            loadNews()
+        }
+    }
+
+    fun removeRssFeed(url: String) {
+        viewModelScope.launch {
+            preferencesManager.saveRssFeeds(preferencesManager.getRssFeeds() - url)
+            loadNews()
+        }
+    }
+
+    /** Re-reads the calendar after the user grants permission. */
+    fun onCalendarPermissionGranted() {
+        loadCalendar()
+    }
+
+    // ==================== WIDGET LAYOUT ====================
+
+    fun toggleWidget(widget: DashboardWidget) {
+        val next = _uiState.value.widgetLayout.toggled(widget)
+        preferencesManager.saveWidgetLayout(next)
+        _uiState.value = _uiState.value.copy(widgetLayout = next)
+    }
+
+    fun moveWidget(widget: DashboardWidget, up: Boolean) {
+        val next = _uiState.value.widgetLayout.moved(widget, up)
+        preferencesManager.saveWidgetLayout(next)
+        _uiState.value = _uiState.value.copy(widgetLayout = next)
+    }
+
+    // ==================== CALENDAR ====================
+
+    private fun loadCalendar() {
+        viewModelScope.launch {
+            // Absence of permission is a distinct state from an error: the widget should
+            // offer a "grant access" action rather than a "retry" that can never succeed.
+            if (!calendarRepository.hasPermission()) {
+                _uiState.value = _uiState.value.copy(
+                    isCalendarLoading = false,
+                    calendarPermissionMissing = true,
+                    calendarError = null
+                )
+                return@launch
+            }
+
+            _uiState.value = _uiState.value.copy(
+                isCalendarLoading = true,
+                calendarPermissionMissing = false
+            )
+
+            calendarRepository.fetchAndCacheEvents()
+                .onSuccess { events ->
+                    _uiState.value = _uiState.value.copy(
+                        calendarEvents = events,
+                        isCalendarLoading = false,
+                        calendarError = null,
+                        calendarLastUpdated = System.currentTimeMillis()
+                    )
+                    updateMascotMood()
+                }
+                .onFailure { error ->
+                    val cached = calendarRepository.getCachedEvents()
+                    _uiState.value = _uiState.value.copy(
+                        calendarEvents = cached,
+                        isCalendarLoading = false,
+                        calendarError = if (cached.isEmpty()) error.message else null
+                    )
+                }
+        }
+    }
+
     // ==================== MASCOT ====================
 
     private fun loadMascot() {
         viewModelScope.launch {
             try {
-                val mascotState = mascotRepository.getMascotState()
-                _uiState.value = _uiState.value.copy(mascotState = mascotState)
+                val mascotState = mascotRepository.getCachedMascotState()
+                _uiState.value = _uiState.value.copy(
+                    mascotState = mascotState,
+                    mascotAnimationsEnabled = preferencesManager.areMascotAnimationsEnabled(),
+                    darkMode = preferencesManager.getDarkMode()
+                )
             } catch (e: Exception) {
                 // Use default mascot state on error
                 _uiState.value = _uiState.value.copy(
                     mascotState = MascotStateEntity(
                         character = "robot",
                         mood = "neutral",
-                        lastUpdated = System.currentTimeMillis()
+                        animation = "robot_idle",
+                        lastUpdate = System.currentTimeMillis()
                     )
                 )
             }
@@ -323,13 +466,14 @@ class DashboardViewModel @Inject constructor(
             val currentMascot = currentState.mascotState ?: MascotStateEntity(
                 character = "robot",
                 mood = "neutral",
-                lastUpdated = System.currentTimeMillis()
+                animation = "robot_idle",
+                lastUpdate = System.currentTimeMillis()
             )
             
             if (currentMascot.mood != newMood) {
                 val updatedMascot = currentMascot.copy(
                     mood = newMood,
-                    lastUpdated = System.currentTimeMillis()
+                    lastUpdate = System.currentTimeMillis()
                 )
                 mascotRepository.updateMascotState(updatedMascot)
                 _uiState.value = currentState.copy(mascotState = updatedMascot)
@@ -392,7 +536,8 @@ class DashboardViewModel @Inject constructor(
             WidgetType.NEWS -> _uiState.value.newsLastUpdated
             WidgetType.FLIGHTS -> _uiState.value.flightsLastUpdated
             WidgetType.SPOTIFY -> _uiState.value.spotifyLastUpdated
-            WidgetType.MASCOT -> _uiState.value.mascotState?.lastUpdated
+            WidgetType.CALENDAR -> _uiState.value.calendarLastUpdated
+            WidgetType.MASCOT -> _uiState.value.mascotState?.lastUpdate
         }
         
         return timestamp?.let { cacheManager.getHumanReadableTime(it) } ?: "Never"
@@ -404,6 +549,7 @@ class DashboardViewModel @Inject constructor(
     fun isWidgetStale(widgetType: WidgetType): Boolean {
         val cacheInfo = when (widgetType) {
             WidgetType.WEATHER -> _cacheStatus.value["weather"]
+            WidgetType.CALENDAR -> _cacheStatus.value["calendar"]
             WidgetType.NEWS -> _cacheStatus.value["news"]
             WidgetType.FLIGHTS -> _cacheStatus.value["flights"]
             WidgetType.SPOTIFY -> _cacheStatus.value["spotify"]
@@ -411,9 +557,9 @@ class DashboardViewModel @Inject constructor(
         }
         
         return cacheInfo?.level in listOf(
-            CacheManager.CacheLevel.STALE,
-            CacheManager.CacheLevel.EXPIRED,
-            CacheManager.CacheLevel.VERY_OLD
+            CacheLevel.STALE,
+            CacheLevel.EXPIRED,
+            CacheLevel.VERY_OLD
         )
     }
 }
@@ -423,12 +569,10 @@ class DashboardViewModel @Inject constructor(
  */
 enum class WidgetType {
     WEATHER,
+    CALENDAR,
     NEWS,
     FLIGHTS,
     SPOTIFY,
     MASCOT
 }
 
-// Helper extension for coroutine scoping
-private inline fun <T> ViewModel.async(crossinline block: suspend () -> T) = 
-    kotlinx.coroutines.async(viewModelScope.coroutineContext, block = block)

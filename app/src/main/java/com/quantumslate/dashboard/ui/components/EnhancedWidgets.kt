@@ -14,6 +14,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import com.quantumslate.dashboard.data.local.CacheLevel
 import com.quantumslate.dashboard.data.local.CacheManager
 import java.text.SimpleDateFormat
 import java.util.*
@@ -30,17 +36,19 @@ fun WeatherWidgetWithStatus(
     isLoading: Boolean,
     errorMessage: String?,
     lastUpdated: Long?,
-    cacheLevel: CacheManager.CacheLevel,
+    cacheLevel: CacheLevel,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     WidgetStateHandler(
         isLoading = isLoading,
-        isError = errorMessage != null,
+        hasError = errorMessage != null,
         isEmpty = weather == null,
         errorMessage = errorMessage,
         loadingMessage = "Fetching weather...",
-        emptyMessage = "No weather data available"
+        emptyMessage = "No weather data available",
+        onRetry = onRefresh,
+        onRefresh = onRefresh
     ) {
         Card(
             modifier = modifier.fillMaxWidth(),
@@ -81,7 +89,7 @@ fun WeatherWidgetWithStatus(
                             enabled = !isLoading
                         ) {
                             Icon(
-                                imageVector = androidx.compose.material.icons.Icons.Default.Refresh,
+                                imageVector = Icons.Default.Refresh,
                                 contentDescription = "Refresh",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -139,18 +147,22 @@ fun NewsWidgetWithStatus(
     isLoading: Boolean,
     errorMessage: String?,
     lastUpdated: Long?,
-    cacheLevel: CacheManager.CacheLevel,
+    cacheLevel: CacheLevel,
     onRefresh: () -> Unit,
     onArticleClick: (String) -> Unit,
+    onAddFeed: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     WidgetStateHandler(
         isLoading = isLoading,
-        isError = errorMessage != null && articles.isEmpty(),
+        hasError = errorMessage != null && articles.isEmpty(),
         isEmpty = articles.isEmpty() && errorMessage == null,
         errorMessage = errorMessage,
         loadingMessage = "Fetching news...",
-        emptyMessage = "No news articles. Add RSS feeds in settings."
+        emptyMessage = "No news articles yet. Add an RSS feed to get started.",
+        onRetry = onRefresh,
+        onRefresh = onRefresh,
+        onAddData = onAddFeed
     ) {
         Card(
             modifier = modifier.fillMaxWidth(),
@@ -186,12 +198,23 @@ fun NewsWidgetWithStatus(
                             )
                         }
                         
+                        if (onAddFeed != null) {
+                            IconButton(onClick = onAddFeed) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Add news feed",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+
                         IconButton(
                             onClick = onRefresh,
                             enabled = !isLoading
                         ) {
                             Icon(
-                                imageVector = androidx.compose.material.icons.Icons.Default.Refresh,
+                                imageVector = Icons.Default.Refresh,
                                 contentDescription = "Refresh",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -249,7 +272,7 @@ private fun NewsItemEnhanced(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 
-                article.publishedAt?.let { published ->
+                article.pubDate.let { published ->
                     Text(
                         text = formatRelativeTime(published),
                         style = MaterialTheme.typography.labelSmall,
@@ -269,18 +292,21 @@ fun FlightWidgetWithStatus(
     isLoading: Boolean,
     errorMessage: String?,
     lastUpdated: Long?,
-    cacheLevel: CacheManager.CacheLevel,
+    cacheLevel: CacheLevel,
     onRefresh: () -> Unit,
     onAddFlight: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     WidgetStateHandler(
         isLoading = isLoading,
-        isError = errorMessage != null && flights.isEmpty(),
+        hasError = errorMessage != null && flights.isEmpty(),
         isEmpty = flights.isEmpty() && errorMessage == null,
         errorMessage = errorMessage,
         loadingMessage = "Fetching flight status...",
-        emptyMessage = "No tracked flights. Tap + to add one."
+        emptyMessage = "No tracked flights yet.",
+        onRetry = onRefresh,
+        onRefresh = onRefresh,
+        onAddData = onAddFlight
     ) {
         Card(
             modifier = modifier.fillMaxWidth(),
@@ -320,7 +346,7 @@ fun FlightWidgetWithStatus(
                             onClick = onAddFlight
                         ) {
                             Icon(
-                                imageVector = androidx.compose.material.icons.Icons.Default.Add,
+                                imageVector = Icons.Default.Add,
                                 contentDescription = "Add Flight",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -332,7 +358,7 @@ fun FlightWidgetWithStatus(
                             enabled = !isLoading
                         ) {
                             Icon(
-                                imageVector = androidx.compose.material.icons.Icons.Default.Refresh,
+                                imageVector = Icons.Default.Refresh,
                                 contentDescription = "Refresh",
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
@@ -433,7 +459,7 @@ fun SpotifyWidgetWithStatus(
     isLoading: Boolean,
     errorMessage: String?,
     lastUpdated: Long?,
-    cacheLevel: CacheManager.CacheLevel,
+    cacheLevel: CacheLevel,
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -462,7 +488,7 @@ fun SpotifyWidgetWithStatus(
                 )
             } else if (track == null || !track.isPlaying) {
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.MusicNote,
+                    imageVector = Icons.Default.MusicNote,
                     contentDescription = "Music",
                     modifier = Modifier.size(48.dp),
                     tint = Color.White.copy(alpha = 0.7f)
@@ -498,7 +524,7 @@ fun SpotifyWidgetWithStatus(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.MusicNote,
+                            imageVector = Icons.Default.MusicNote,
                             contentDescription = null,
                             tint = Color.White
                         )
@@ -538,7 +564,7 @@ fun SpotifyWidgetWithStatus(
                 
                 // Playing indicator
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.PlayArrow,
+                    imageVector = Icons.Default.PlayArrow,
                     contentDescription = "Playing",
                     tint = Color.White,
                     modifier = Modifier.size(32.dp)
@@ -552,7 +578,7 @@ fun SpotifyWidgetWithStatus(
                     enabled = !isLoading
                 ) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Refresh,
+                        imageVector = Icons.Default.Refresh,
                         contentDescription = "Refresh",
                         tint = Color.White,
                         modifier = Modifier.size(20.dp)
@@ -582,17 +608,17 @@ fun SpotifyWidgetWithStatus(
 // ==================== HELPER FUNCTIONS ====================
 
 @Composable
-private fun StaleDataIndicator(
+internal fun StaleDataIndicator(
     lastUpdated: Long,
-    cacheLevel: CacheManager.CacheLevel,
+    cacheLevel: CacheLevel,
     textColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
     val timeAgo = getHumanReadableTimeAgo(lastUpdated)
     val indicatorColor = when (cacheLevel) {
-        CacheManager.CacheLevel.FRESH -> Color(0xFF4CAF50)      // Green
-        CacheManager.CacheLevel.STALE -> Color(0xFFFFB74D)      // Amber
-        CacheManager.CacheLevel.EXPIRED -> Color(0xFFFF9800)    // Orange
-        CacheManager.CacheLevel.VERY_OLD -> Color(0xFFF44336)   // Red
+        CacheLevel.FRESH -> Color(0xFF4CAF50)      // Green
+        CacheLevel.STALE -> Color(0xFFFFB74D)      // Amber
+        CacheLevel.EXPIRED -> Color(0xFFFF9800)    // Orange
+        CacheLevel.VERY_OLD -> Color(0xFFF44336)   // Red
     }
     
     Row(
@@ -633,7 +659,7 @@ private fun formatDuration(ms: Long): String {
     return String.format("%d:%02d", minutes, secs)
 }
 
-private fun formatRelativeTime(timestamp: Long): String {
+internal fun formatRelativeTime(timestamp: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - timestamp
     

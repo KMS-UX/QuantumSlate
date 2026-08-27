@@ -1,7 +1,7 @@
 package com.quantumslate.dashboard.data.remote
 
+import com.quantumslate.dashboard.BuildConfig
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
@@ -13,9 +13,7 @@ object ApiClient {
     private var rssRetrofit: Retrofit? = null
 
     private fun createOkHttpClient(): OkHttpClient {
-        val logging = HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
-        }
+        val logging = RedactingLogInterceptor(enabled = BuildConfig.DEBUG)
         return OkHttpClient.Builder()
             .addInterceptor(logging)
             .connectTimeout(30, TimeUnit.SECONDS)

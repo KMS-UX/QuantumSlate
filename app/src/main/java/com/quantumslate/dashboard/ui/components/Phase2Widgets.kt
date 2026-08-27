@@ -5,6 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -143,7 +147,7 @@ fun FlightStatusWidget(
                 
                 IconButton(onClick = onAddFlight) {
                     Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Add,
+                        imageVector = Icons.Default.Add,
                         contentDescription = "Add Flight",
                         tint = MaterialTheme.colorScheme.primary
                     )
@@ -274,7 +278,7 @@ fun SpotifyWidget(
                 )
             } else if (track == null || !track.isPlaying) {
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.MusicNote,
+                    imageVector = Icons.Default.MusicNote,
                     contentDescription = "Music",
                     modifier = Modifier.size(48.dp),
                     tint = Color.White.copy(alpha = 0.7f)
@@ -310,7 +314,7 @@ fun SpotifyWidget(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = androidx.compose.material.icons.Icons.Default.MusicNote,
+                            imageVector = Icons.Default.MusicNote,
                             contentDescription = null,
                             tint = Color.White
                         )
@@ -350,7 +354,7 @@ fun SpotifyWidget(
                 
                 // Playing indicator
                 Icon(
-                    imageVector = androidx.compose.material.icons.Icons.Default.PlayArrow,
+                    imageVector = Icons.Default.PlayArrow,
                     contentDescription = "Playing",
                     tint = Color.White,
                     modifier = Modifier.size(32.dp)

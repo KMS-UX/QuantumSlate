@@ -4,12 +4,13 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class PreferencesManager @Inject constructor(
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) {
     private val encryptedPrefs: EncryptedSharedPreferences by lazy {
         val masterKey = MasterKey.Builder(context)
@@ -61,7 +62,8 @@ class PreferencesManager @Inject constructor(
     fun getDefaultUiMode(): UiMode = UiMode.valueOf(regularPrefs.getString("default_ui_mode", UiMode.MINIMALIST.name) ?: UiMode.MINIMALIST.name)
     fun saveDefaultUiMode(mode: UiMode) = regularPrefs.edit().putString("default_ui_mode", mode.name).apply()
 
-    fun getMascotCharacter(): String = regularPrefs.getString("mascot_character", "robot") ?: "robot"
+    fun getMascotCharacter(): String = regularPrefs.getString("mascot_character", QUANTUM_BOY) ?: QUANTUM_BOY
+    /** The only shipped mascot; kept as a setting for future characters. */
     fun saveMascotCharacter(character: String) = regularPrefs.edit().putString("mascot_character", character).apply()
 
     fun getMascotAnimationsEnabled(): Boolean = regularPrefs.getBoolean("mascot_animations_enabled", true)
@@ -100,6 +102,17 @@ class PreferencesManager @Inject constructor(
     
     fun getSpotifyAccessToken(): String? = encryptedPrefs.getString("spotify_access_token", null)
     fun saveSpotifyAccessToken(token: String) = encryptedPrefs.edit().putString("spotify_access_token", token).apply()
+
+    /** Epoch millis at which the stored access token stops being valid. */
+    fun getSpotifyTokenExpiry(): Long = encryptedPrefs.getLong("spotify_token_expiry", 0L)
+    fun saveSpotifyTokenExpiry(expiryMillis: Long) = encryptedPrefs.edit().putLong("spotify_token_expiry", expiryMillis).apply()
+
+    /** Clears every Spotify credential; used when the user disconnects or auth is revoked. */
+    fun clearSpotifyTokens() = encryptedPrefs.edit()
+        .remove("spotify_access_token")
+        .remove("spotify_refresh_token")
+        .remove("spotify_token_expiry")
+        .apply()
     
     fun isSpotifyEnabled(): Boolean = regularPrefs.getBoolean("spotify_enabled", false)
     fun saveSpotifyEnabled(enabled: Boolean) = regularPrefs.edit().putBoolean("spotify_enabled", enabled).apply()
@@ -127,5 +140,34 @@ class PreferencesManager @Inject constructor(
 
     enum class UpdateMode { DAILY, AMBIENT, REAL_TIME }
     enum class DarkMode { LIGHT, DARK, AUTO }
-    enum class UiMode { MINIMALIST, DATA_DENSE, RETRO }
+    // ==================== Widget layout (Bible §5) ====================
+
+    /**
+     * Persisted as two delimited strings rather than a serialised object, matching how the
+     * rest of this class stores lists and keeping it readable in `adb shell dumpsys`.
+     */
+    fun getWidgetLayout(): WidgetLayout {
+        val orderRaw = regularPrefs.getString("widget_order", null)
+        val enabledRaw = regularPrefs.getString("widget_enabled", null)
+
+        val order = orderRaw?.split("|")?.mapNotNull { DashboardWidget.fromKey(it) }
+            ?.takeIf { it.isNotEmpty() }
+            // Append any widget added in a later app version so it is never silently missing.
+            ?.let { stored -> stored + DashboardWidget.entries.filterNot { it in stored } }
+            ?: DashboardWidget.entries.toList()
+
+        val enabled = enabledRaw?.split("|")?.mapNotNull { DashboardWidget.fromKey(it) }?.toSet()
+            ?: DashboardWidget.entries.toSet()
+
+        return WidgetLayout(enabled = enabled, order = order)
+    }
+
+    fun saveWidgetLayout(layout: WidgetLayout) = regularPrefs.edit()
+        .putString("widget_order", layout.order.joinToString("|") { it.key })
+        .putString("widget_enabled", layout.enabled.joinToString("|") { it.key })
+        .apply()
+
+    companion object { const val QUANTUM_BOY = "quantum_boy" }
+
+    enum class UiMode { MINIMALIST, DATA_DENSE, RETRO, QUANTUM_EFFECT }
 }

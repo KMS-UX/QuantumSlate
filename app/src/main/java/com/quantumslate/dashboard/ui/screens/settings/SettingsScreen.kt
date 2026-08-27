@@ -24,6 +24,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,9 +41,16 @@ import com.quantumslate.dashboard.data.local.PreferencesManager
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     onNavigateBack: () -> Unit = {},
+    /** Signals that a saved setting should invalidate the dashboard's cached data. */
+    onSettingsChanged: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val settingsState by viewModel.settingsState.collectAsState()
+    var spotifyError by remember { mutableStateOf<String?>(null) }
+
+    // The consent flow completes in a separate activity, so re-read connection state each
+    // time this screen is composed again.
+    LaunchedEffect(Unit) { viewModel.refreshSpotifyState() }
 
     Scaffold(
         topBar = {
@@ -76,7 +84,7 @@ fun SettingsScreen(
                     ApiKeySetting(
                         label = "OpenWeatherMap API Key",
                         value = settingsState.openWeatherApiKey ?: "",
-                        onSave = { viewModel.saveOpenWeatherApiKey(it) }
+                        onSave = { viewModel.saveOpenWeatherApiKey(it); onSettingsChanged() }
                     )
                     
                     Divider(modifier = Modifier.padding(vertical = 8.dp))
@@ -84,8 +92,67 @@ fun SettingsScreen(
                     ApiKeySetting(
                         label = "Flight API Key",
                         value = settingsState.flightApiKey ?: "",
-                        onSave = { viewModel.saveFlightApiKey(it) }
+                        onSave = { viewModel.saveFlightApiKey(it); onSettingsChanged() }
                     )
+                }
+
+                // Spotify uses OAuth rather than a bare key, so it gets its own section.
+                SettingsSection(title = "Spotify") {
+                    ApiKeySetting(
+                        label = "Spotify Client ID",
+                        value = settingsState.spotifyClientId ?: "",
+                        onSave = { viewModel.saveSpotifyClientId(it) }
+                    )
+
+                    Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (settingsState.spotifyConnected) "Connected" else "Not connected",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                text = if (settingsState.spotifyConnected) {
+                                    "Now Playing will show your current track."
+                                } else {
+                                    "Save your Client ID, then connect to authorise playback access."
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                            spotifyError?.let {
+                                Text(
+                                    text = it,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+
+                        if (settingsState.spotifyConnected) {
+                            Button(onClick = {
+                                viewModel.disconnectSpotify()
+                                onSettingsChanged()
+                            }) {
+                                Text("Disconnect")
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    spotifyError = viewModel.connectSpotify().exceptionOrNull()
+                                        ?.let { "Enter and save a Client ID first." }
+                                },
+                                enabled = !settingsState.spotifyClientId.isNullOrBlank()
+                            ) {
+                                Text("Connect")
+                            }
+                        }
+                    }
                 }
 
                 // Display Settings Section
@@ -127,8 +194,6 @@ fun SettingsScreen(
 
                 // Mascot Settings Section
                 SettingsSection(title = "Mascot") {
-                    var mascotDialogOpen by remember { mutableStateOf(false) }
-                    
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -136,32 +201,27 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Character",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Quantum Boy reacts to your weather, calendar and flights.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
                         Text(
-                            text = "Character",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = settingsState.mascotCharacter,
+                            text = "Quantum Boy",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                            modifier = Modifier.clickable { mascotDialogOpen = true }
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     }
-                    
-                    if (mascotDialogOpen) {
-                        MascotCharacterDialog(
-                            currentCharacter = settingsState.mascotCharacter,
-                            onCharacterSelected = { 
-                                viewModel.saveMascotCharacter(it)
-                                mascotDialogOpen = false
-                            },
-                            onDismiss = { mascotDialogOpen = false }
-                        )
-                    }
-                    
+
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     BooleanSetting(
                         label = "Enable Animations",
                         value = settingsState.mascotAnimationsEnabled,
@@ -174,7 +234,7 @@ fun SettingsScreen(
                     BooleanSetting(
                         label = "Use GPS for Weather",
                         value = settingsState.locationEnabled,
-                        onValueChange = { viewModel.saveLocationEnabled(it) }
+                        onValueChange = { viewModel.saveLocationEnabled(it); onSettingsChanged() }
                     )
                 }
             }
@@ -419,35 +479,3 @@ fun TimeSetting(
     }
 }
 
-@Composable
-fun MascotCharacterDialog(
-    currentCharacter: String,
-    onCharacterSelected: (String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val characters = listOf("robot", "cat", "bird", "creature")
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Choose Mascot") },
-        text = {
-            Column {
-                characters.forEach { character ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onCharacterSelected(character) }
-                            .padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(character.replaceFirstChar { it.uppercase() })
-                        if (character == currentCharacter) {
-                            Text("✓", color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {}
-    )
-}

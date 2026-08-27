@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,7 +21,7 @@ import javax.inject.Singleton
 class WeatherRepository @Inject constructor(
     private val weatherDao: WeatherDao,
     private val preferencesManager: PreferencesManager,
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) {
     val weather: Flow<Weather?> = weatherDao.getWeather().map { it?.toDomainModel() }.flowOn(Dispatchers.IO)
 

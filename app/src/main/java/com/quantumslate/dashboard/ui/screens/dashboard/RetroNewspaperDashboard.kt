@@ -1,6 +1,7 @@
 package com.quantumslate.dashboard.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,7 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,8 +29,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.quantumslate.dashboard.ui.permissions.rememberCalendarPermissionRequester
+import com.quantumslate.dashboard.data.local.CacheLevel
+import com.quantumslate.dashboard.data.local.cacheLevelFor
 import com.quantumslate.dashboard.data.local.PreferencesManager
 import com.quantumslate.dashboard.ui.theme.QuantumSlateTheme
 import java.text.SimpleDateFormat
@@ -35,10 +44,12 @@ import java.util.Locale
 @Composable
 fun RetroNewspaperDashboard(
     modifier: Modifier = Modifier,
-    onNavigateToSettings: () -> Unit = {}
+    onNavigateToSettings: () -> Unit = {},
+    darkMode: PreferencesManager.DarkMode = PreferencesManager.DarkMode.AUTO
 ) {
     QuantumSlateTheme(
-        uiMode = PreferencesManager.UiMode.RETRO
+        uiMode = PreferencesManager.UiMode.RETRO,
+        darkMode = darkMode
     ) {
         Surface(
             modifier = modifier.fillMaxSize(),
@@ -59,27 +70,68 @@ fun RetroNewspaperDashboard(
                         Text(
                             text = "The Daily Quantum",
                             style = MaterialTheme.typography.displayLarge,
-                            fontFamily = FontFamily.Serif,
-                            fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         
                         Spacer(modifier = Modifier.height(8.dp))
                         
-                        val dateFormat = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault())
-                        Text(
-                            text = dateFormat.format(Date()),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontFamily = FontFamily.Serif,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                        // Thin rule directly under the masthead, as on a period front page.
+                        Divider(
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f),
+                            modifier = Modifier.fillMaxWidth(0.72f)
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Folio line: edition marker, date, price - the newspaper convention.
+                        Row(
+                            modifier = Modifier.fillMaxWidth(0.72f),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "VOL. I",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f)
+                            )
+                            val dateFormat = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault())
+                            Text(
+                                text = dateFormat.format(Date()).uppercase(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f)
+                            )
+                            Text(
+                                text = "PRICE 5¢",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f)
+                            )
+                        }
+                    }
+
+                    // Gear sits in the masthead's top-right corner (Bible §3).
+                    IconButton(
+                        onClick = onNavigateToSettings,
+                        modifier = Modifier.align(Alignment.TopEnd)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                 }
 
-                Divider(
-                    thickness = 2.dp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.3f)
-                )
+                Column {
+                    Divider(
+                        thickness = 3.dp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f)
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Divider(
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                    )
+                }
 
                 // Main content area with columns
                 Row(
@@ -106,7 +158,6 @@ fun RetroNewspaperDashboard(
                             Text(
                                 text = timeFormat.format(Date()),
                                 style = MaterialTheme.typography.headlineLarge,
-                                fontFamily = FontFamily.Serif,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -126,7 +177,6 @@ fun RetroNewspaperDashboard(
                                 Text(
                                     text = "Weather Forecast",
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontFamily = FontFamily.Serif,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -140,20 +190,17 @@ fun RetroNewspaperDashboard(
                                     Text(
                                         text = "${weather.temperature.toInt()}°C - ${weather.condition}",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        fontFamily = FontFamily.Serif,
                                         color = MaterialTheme.colorScheme.onSurface
                                     )
                                     Text(
                                         text = "High: ${weather.highTemp.toInt()}° | Low: ${weather.lowTemp.toInt()}°",
                                         style = MaterialTheme.typography.bodySmall,
-                                        fontFamily = FontFamily.Serif,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                                     )
                                 } ?: run {
                                     Text(
                                         text = "Forecast unavailable",
                                         style = MaterialTheme.typography.bodyMedium,
-                                        fontFamily = FontFamily.Serif,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                                     )
                                 }
@@ -171,6 +218,10 @@ fun RetroNewspaperDashboard(
                         // Mascot section
                         val dashboardViewModel: DashboardViewModel = hiltViewModel()
                         val uiState by dashboardViewModel.uiState.collectAsState()
+
+            val requestCalendarPermission = rememberCalendarPermissionRequester { granted ->
+                if (granted) dashboardViewModel.onCalendarPermissionGranted()
+            }
                         
                         Box(
                             modifier = Modifier
@@ -183,13 +234,10 @@ fun RetroNewspaperDashboard(
                                 .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            LottieMascotWidget(
-                                mascotState = uiState.mascotState ?: com.quantumslate.dashboard.data.local.MascotStateEntity(
-                                    character = "robot",
-                                    mood = "neutral",
-                                    lastUpdated = System.currentTimeMillis()
-                                ),
-                                size = 100f
+                            MascotWidget(
+                                mascotState = uiState.mascotState,
+                                size = 120,
+                                animationsEnabled = uiState.mascotAnimationsEnabled
                             )
                         }
                         
@@ -210,17 +258,52 @@ fun RetroNewspaperDashboard(
                                 Text(
                                     text = "Social Calendar",
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontFamily = FontFamily.Serif,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "No events scheduled",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontFamily = FontFamily.Serif,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                )
+
+                                // Rendered in the newspaper's own voice rather than with the
+                                // Material calendar card, to keep the retro column intact.
+                                when {
+                                    uiState.calendarPermissionMissing -> {
+                                        Text(
+                                            text = "Calendar access required",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "Tap to grant",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.clickable { requestCalendarPermission() }
+                                        )
+                                    }
+
+                                    uiState.calendarEvents.isEmpty() -> Text(
+                                        text = "No events scheduled",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+
+                                    else -> uiState.calendarEvents.take(3).forEach { event ->
+                                        Text(
+                                            text = event.title,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Text(
+                                            text = retroEventTime(event.startTime, event.isAllDay),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                    }
+                                }
                             }
                         }
                     }
@@ -244,7 +327,6 @@ fun RetroNewspaperDashboard(
                         Text(
                             text = "Latest Headlines",
                             style = MaterialTheme.typography.titleMedium,
-                            fontFamily = FontFamily.Serif,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
                         )
@@ -258,14 +340,14 @@ fun RetroNewspaperDashboard(
                                 StaleDataIndicator(
                                     lastUpdated = uiState.newsLastUpdated!!,
                                     cacheLevel = uiState.newsLastUpdated?.let { 
-                                        com.quantumslate.dashboard.data.local.CacheManager.getCacheLevel(it, 2 * 60 * 60 * 1000) 
-                                    } ?: com.quantumslate.dashboard.data.local.CacheManager.CacheLevel.EXPIRED
+                                        cacheLevelFor(it, 2 * 60 * 60 * 1000) 
+                                    } ?: CacheLevel.EXPIRED
                                 )
                             }
                             
                             IconButton(onClick = { dashboardViewModel.refreshWidget(WidgetType.NEWS) }) {
                                 Icon(
-                                    imageVector = androidx.compose.material.icons.Icons.Default.Refresh,
+                                    imageVector = Icons.Default.Refresh,
                                     contentDescription = "Refresh News",
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = androidx.compose.ui.Modifier.size(18.dp)
@@ -280,21 +362,18 @@ fun RetroNewspaperDashboard(
                         Text(
                             text = "Loading headlines...",
                             style = MaterialTheme.typography.bodyMedium,
-                            fontFamily = FontFamily.Serif,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                         )
                     } else if (uiState.newsError != null && uiState.newsArticles.isEmpty()) {
                         Text(
                             text = "News unavailable: ${uiState.newsError}",
                             style = MaterialTheme.typography.bodyMedium,
-                            fontFamily = FontFamily.Serif,
                             color = MaterialTheme.colorScheme.error
                         )
                     } else if (uiState.newsArticles.isEmpty()) {
                         Text(
                             text = "No headlines available. Add RSS feeds in settings.",
                             style = MaterialTheme.typography.bodyMedium,
-                            fontFamily = FontFamily.Serif,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                         )
                     } else {
@@ -308,7 +387,6 @@ fun RetroNewspaperDashboard(
                                 Text(
                                     text = "• ${article.title}",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontFamily = FontFamily.Serif,
                                     color = MaterialTheme.colorScheme.onBackground,
                                     maxLines = 2
                                 )
@@ -319,14 +397,12 @@ fun RetroNewspaperDashboard(
                                     Text(
                                         text = article.source,
                                         style = MaterialTheme.typography.labelSmall,
-                                        fontFamily = FontFamily.Serif,
                                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                                     )
-                                    article.publishedAt?.let { published ->
+                                    article.pubDate.let { published ->
                                         Text(
-                                            text = com.quantumslate.dashboard.data.local.CacheManager.getHumanReadableTime(published),
+                                            text = formatRelativeTime(published),
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontFamily = FontFamily.Serif,
                                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
                                         )
                                     }
@@ -338,5 +414,22 @@ fun RetroNewspaperDashboard(
                 }
             }
         }
+    }
+}
+
+/** Event time in the newspaper's register, e.g. "Today, 14:30" or "Fri 12 Sep — all day". */
+private fun retroEventTime(startTime: Long, isAllDay: Boolean): String {
+    val start = Date(startTime)
+    val today = SimpleDateFormat("yyyyDDD", Locale.getDefault())
+    val isToday = today.format(start) == today.format(Date())
+    val dayLabel = if (isToday) {
+        "Today"
+    } else {
+        SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(start)
+    }
+    return if (isAllDay) {
+        "$dayLabel — all day"
+    } else {
+        "$dayLabel, " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(start)
     }
 }

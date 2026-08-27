@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.quantumslate.dashboard.data.local.CacheExpiry
 import com.quantumslate.dashboard.data.local.PreferencesManager
 import com.quantumslate.dashboard.data.repository.FlightRepository
 import com.quantumslate.dashboard.data.repository.MascotRepository
@@ -27,11 +28,15 @@ class DashboardUpdateWorker @AssistedInject constructor(
     private val flightRepository: FlightRepository,
     private val spotifyRepository: SpotifyRepository,
     private val mascotRepository: MascotRepository,
-    private val preferencesManager: PreferencesManager
+    private val preferencesManager: PreferencesManager,
+    private val cacheExpiry: CacheExpiry
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result = coroutineScope {
         try {
+            // Bible §6: drop anything past its useful life before fetching new data.
+            cacheExpiry.purgeExpired()
+
             // Fetch weather data
             fetchWeather()
             

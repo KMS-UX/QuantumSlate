@@ -15,7 +15,7 @@ import androidx.room.RoomDatabase
         SpotifyTrackEntity::class,
         MascotStateEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,7 +36,10 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "quantumslate_database"
-                ).build()
+                )
+                    // All tables are API caches; rebuilding on upgrade loses nothing.
+                    .fallbackToDestructiveMigration()
+                    .build()
                 INSTANCE = instance
                 instance
             }

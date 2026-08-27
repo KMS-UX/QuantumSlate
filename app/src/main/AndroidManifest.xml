@@ -5,13 +5,19 @@
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!--
+        Location permissions are intentionally NOT declared. The Bible §6 lists them for
+        weather, but this build never reads device location: the user types a place name in
+        Settings and it is resolved with Geocoder, which needs no permission. Declaring an
+        unused location permission would show users a prompt for a capability the app does
+        not have. Re-add both if GPS-based weather is ever implemented.
+    -->
     <uses-permission android:name="android.permission.READ_CALENDAR" />
-    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <!-- READ only: the calendar repository never writes, so WRITE_CALENDAR is not declared. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
@@ -23,6 +29,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.QuantumSlate"
         android:hardwareAccelerated="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="34">
 
         <activity
@@ -36,7 +43,10 @@
             </intent-filter>
         </activity>
 
-        <!-- WorkManager initialization -->
+        <!--
+            Remove WorkManager's default on-startup initializer: the app supplies its own
+            Configuration (with the Hilt worker factory) from QuantumSlateApplication.
+        -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
@@ -44,8 +54,30 @@
             tools:node="merge">
             <meta-data
                 android:name="androidx.work.WorkManagerInitializer"
-                android:value="androidx.startup" />
+                android:value="androidx.startup"
+                tools:node="remove" />
         </provider>
+
+        <!-- Real-Time update mode (Bible §4); opt-in, with a battery warning on its notification -->
+        <service
+            android:name=".work.RealtimeSyncService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Spotify OAuth redirect target; scheme must match SpotifyAuth.REDIRECT_URI -->
+        <activity
+            android:name=".data.remote.spotify.SpotifyRedirectActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="quantumslate" android:host="spotify-callback" />
+            </intent-filter>
+        </activity>
 
         <!-- Time & Weather Home Screen Widget -->
         <receiver

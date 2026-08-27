@@ -58,7 +58,9 @@ interface SpotifyApiService {
 }
 
 interface RssApiService {
-    @GET(".")
+    // @GET must carry no path when @Url supplies the full address; Retrofit rejects
+    // the combination at call time otherwise.
+    @GET
     suspend fun getRssFeed(
         @Url url: String
     ): Document

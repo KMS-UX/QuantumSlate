@@ -16,21 +16,28 @@ interface WeatherDao {
 
     @Query("DELETE FROM weather")
     suspend fun clearWeather()
+
+    @Query("DELETE FROM weather WHERE timestamp < :cutoff")
+    suspend fun deleteWeatherOlderThan(cutoff: Long)
 }
 
 @Dao
 interface CalendarDao {
-    @Query("SELECT * FROM calendar_event ORDER BY startTime ASC LIMIT 3")
-    fun getUpcomingEvents(): Flow<List<CalendarEventEntity>>
+    @Query("SELECT * FROM calendar_event WHERE endTime >= :now ORDER BY startTime ASC LIMIT :limit")
+    fun getUpcomingEvents(now: Long, limit: Int = 3): Flow<List<CalendarEventEntity>>
 
-    @Query("SELECT * FROM calendar_event ORDER BY startTime ASC LIMIT 3")
-    suspend fun getUpcomingEventsOnce(): List<CalendarEventEntity>
+    @Query("SELECT * FROM calendar_event WHERE endTime >= :now ORDER BY startTime ASC LIMIT :limit")
+    suspend fun getUpcomingEventsOnce(now: Long, limit: Int = 3): List<CalendarEventEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEvents(events: List<CalendarEventEntity>)
 
     @Query("DELETE FROM calendar_event")
     suspend fun clearEvents()
+
+    /** Events whose end time has passed are never shown again. */
+    @Query("DELETE FROM calendar_event WHERE endTime < :cutoff")
+    suspend fun deleteEventsEndedBefore(cutoff: Long)
 }
 
 @Dao
@@ -46,6 +53,9 @@ interface NewsDao {
 
     @Query("DELETE FROM news_article")
     suspend fun clearArticles()
+
+    @Query("DELETE FROM news_article WHERE pubDate < :cutoff")
+    suspend fun deleteArticlesOlderThan(cutoff: Long)
 }
 
 @Dao
@@ -82,6 +92,10 @@ interface FlightDao {
 
     @Query("DELETE FROM flight")
     suspend fun clearAllFlights()
+
+    /** Drops flights whose scheduled arrival is long past. */
+    @Query("DELETE FROM flight WHERE scheduledArrival > 0 AND scheduledArrival < :cutoff")
+    suspend fun deleteFlightsArrivedBefore(cutoff: Long)
 }
 
 @Dao
@@ -97,6 +111,9 @@ interface SpotifyDao {
 
     @Query("DELETE FROM spotify_track")
     suspend fun clearTracks()
+
+    @Query("DELETE FROM spotify_track WHERE timestamp < :cutoff")
+    suspend fun deleteTracksOlderThan(cutoff: Long)
 }
 
 @Dao

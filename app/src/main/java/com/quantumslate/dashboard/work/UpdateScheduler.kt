@@ -7,7 +7,6 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -42,40 +41,49 @@ class UpdateScheduler @Inject constructor(
     fun scheduleUpdates() {
         scope.launch {
             try {
-                val updateFrequency = preferencesManager.getUpdateFrequency().first() ?: "daily"
-                
-                // Cancel any existing work
-                workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
-                
-                // Create new work request based on frequency
-                val workRequest = when (updateFrequency.lowercase()) {
-                    "daily" -> createDailyWorkRequest()
-                    "ambient" -> createAmbientWorkRequest()
-                    "realtime" -> createRealtimeWorkRequest()
-                    else -> createDailyWorkRequest()
-                }
-                
-                // Enqueue the work
-                workManager.enqueueUniqueWork(
-                    UNIQUE_WORK_NAME,
-                    ExistingWorkPolicy.REPLACE,
-                    workRequest
-                )
+                val updateFrequency = preferencesManager.getUpdateFrequency() ?: "daily"
+                enqueueFor(updateFrequency)
             } catch (e: Exception) {
-                // Fallback to daily updates
-                workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
-                workManager.enqueueUniqueWork(
-                    UNIQUE_WORK_NAME,
-                    ExistingWorkPolicy.REPLACE,
-                    createDailyWorkRequest()
-                )
+                // Fall back to the safest, lowest-power schedule.
+                enqueueFor("daily")
             }
+        }
+    }
+
+    private fun enqueueFor(updateFrequency: String) {
+        // Cancel whichever flavour of work is currently registered under this name.
+        workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
+
+        // Real-time needs a foreground service (WorkManager's floor is 15 minutes); every
+        // other mode must make sure that service is not left running.
+        if (updateFrequency.lowercase() == "realtime") {
+            RealtimeSyncService.start(context)
+        } else {
+            RealtimeSyncService.stop(context)
+        }
+
+        when (updateFrequency.lowercase()) {
+            "ambient" -> workManager.enqueueUniquePeriodicWork(
+                UNIQUE_WORK_NAME,
+                ExistingPeriodicWorkPolicy.UPDATE,
+                createAmbientWorkRequest()
+            )
+            "realtime" -> workManager.enqueueUniquePeriodicWork(
+                UNIQUE_WORK_NAME,
+                ExistingPeriodicWorkPolicy.UPDATE,
+                createRealtimeWorkRequest()
+            )
+            else -> workManager.enqueueUniqueWork(
+                UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                createDailyWorkRequest()
+            )
         }
     }
 
     private fun createDailyWorkRequest(): OneTimeWorkRequest {
         // Schedule for user-defined time, default to 6 AM
-        val autoUpdateTime = preferencesManager.getAutoUpdateTime().first() ?: "06:00"
+        val autoUpdateTime = preferencesManager.getAutoUpdateTime()
         val (hour, minute) = autoUpdateTime.split(":").map { it.toInt() }
         
         val now = System.currentTimeMillis()
