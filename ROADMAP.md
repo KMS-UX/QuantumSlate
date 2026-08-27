@@ -139,7 +139,7 @@ Currently there is effectively no styling — this is the "no design" you saw.
 | ~~F4~~ | ✅ **Done** — expiry did not exist at all. Cache auto-expiry; "last updated" on every widget. | §6 |
 | ~~F5~~ | ✅ **Done** — accessibility: TalkBack labels, 48dp targets, scalable text, contrast. | §13 |
 | ⏳ F6 | **Needs a device** — performance: <100MB RAM, <2s cold start, 60fps — measure, don't assume. | §6 |
-| ⚠️ F7 | **Recommended against; open decision.** Certificate pinning; confirm no key material is ever logged. | §12 |
+| ~~F7~~ | ✅ **Closed — user approved not implementing it.** Certificate pinning; confirm no key material is ever logged. | §12 |
 
 ---
 
@@ -150,7 +150,7 @@ These were previously marked complete. None exist.
 | # | Task |
 |---|---|
 | ~~G1~~ | ✅ **Done** — 46 tests, 0 failures. Unit tests: mood engine, cache expiry, API parsing, RSS parsing. |
-| ⏳ G2 | **Deferred — needs a device.** Instrumented tests: swipe navigation, settings persistence. |
+| ~~G2~~ | ✅ **Done** — 16 instrumented tests + emulator CI job. Instrumented tests: swipe navigation, settings persistence. |
 | ~~G3~~ | ✅ **Done** — `.github/workflows/android-ci.yml` — build + test + lint. |
 | ~~G4~~ | ✅ **Done** — `README.md` and `SETUP_GUIDE.md` (how to obtain each API key). |
 | ~~G5~~ | ✅ **Done** — release 4.3MB vs debug 21.6MB. Signing config; enable `minifyEnabled` + ProGuard rules. |

@@ -6,12 +6,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!--
-        Location permissions are intentionally NOT declared. The Bible §6 lists them for
-        weather, but this build never reads device location: the user types a place name in
-        Settings and it is resolved with Geocoder, which needs no permission. Declaring an
-        unused location permission would show users a prompt for a capability the app does
-        not have. Re-add both if GPS-based weather is ever implemented.
+        Used only when "Use my location" is enabled in Settings. Coarse is sufficient for a
+        weather lookup; fine is declared because some devices only return a fix from the GPS
+        provider. Requested at runtime, never at install.
     -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <!-- READ only: the calendar repository never writes, so WRITE_CALENDAR is not declared. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />

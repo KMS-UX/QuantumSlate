@@ -89,7 +89,11 @@ fun DashboardPager(
                 )
             }
             .pointerInput(Unit) {
-                detectTapGestures(onLongPress = { showWidgetConfig = true })
+                // requireUnconsumed = false: let the scrollable content receive the gesture
+                // too, so a long-press never blocks a vertical scroll.
+                detectTapGestures(
+                    onLongPress = { showWidgetConfig = true }
+                )
             }
             .pullRefresh(pullRefreshState),
         color = MaterialTheme.colorScheme.background

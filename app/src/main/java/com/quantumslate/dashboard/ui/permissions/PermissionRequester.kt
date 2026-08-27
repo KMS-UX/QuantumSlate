@@ -31,6 +31,30 @@ fun rememberPermissionRequester(
     }
 }
 
+/**
+ * Requester for location, used by the weather widget.
+ *
+ * Asks for both coarse and fine together: some devices only ever return a fix from the GPS
+ * provider, so requesting coarse alone can leave the user granted-but-locationless.
+ */
+@Composable
+fun rememberLocationPermissionRequester(onResult: (Boolean) -> Unit = {}): () -> Unit {
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        onResult = { grants -> onResult(grants.values.any { it }) }
+    )
+    return remember(launcher) {
+        {
+            launcher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                )
+            )
+        }
+    }
+}
+
 /** Requester for READ_CALENDAR, used by the calendar widget. */
 @Composable
 fun rememberCalendarPermissionRequester(onResult: (Boolean) -> Unit = {}): () -> Unit =

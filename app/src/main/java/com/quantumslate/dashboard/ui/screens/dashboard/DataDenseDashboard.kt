@@ -1,5 +1,7 @@
 package com.quantumslate.dashboard.ui.components
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.quantumslate.dashboard.ui.permissions.rememberCalendarPermissionRequester
+import com.quantumslate.dashboard.ui.permissions.rememberLocationPermissionRequester
 import com.quantumslate.dashboard.data.local.CacheLevel
 import com.quantumslate.dashboard.data.local.cacheLevelFor
 import com.quantumslate.dashboard.data.local.DashboardWidget
@@ -62,6 +65,9 @@ fun DataDenseDashboard(
 
             var showAddFlight by remember { mutableStateOf(false) }
             var showAddFeed by remember { mutableStateOf(false) }
+            val requestLocationPermission = rememberLocationPermissionRequester { granted ->
+                if (granted) dashboardViewModel.onLocationPermissionGranted()
+            }
             val requestCalendarPermission = rememberCalendarPermissionRequester { granted ->
                 if (granted) dashboardViewModel.onCalendarPermissionGranted()
             }
@@ -91,6 +97,7 @@ fun DataDenseDashboard(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -147,6 +154,7 @@ fun DataDenseDashboard(
                                 cacheLevelFor(it, 30 * 60 * 1000) 
                             } ?: CacheLevel.EXPIRED,
                             onRefresh = { dashboardViewModel.refreshWidget(WidgetType.WEATHER) },
+                        onRequestLocation = requestLocationPermission.takeIf { uiState.locationPermissionMissing },
                             modifier = Modifier.padding(10.dp)
                         )
                     }

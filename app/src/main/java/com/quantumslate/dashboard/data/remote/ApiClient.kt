@@ -7,6 +7,10 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object ApiClient {
+
+    private const val USER_AGENT =
+        "Mozilla/5.0 (Linux; Android 14) QuantumSlate/1.0 (+dashboard feed reader)"
+
     private var weatherRetrofit: Retrofit? = null
     private var flightRetrofit: Retrofit? = null
     private var spotifyRetrofit: Retrofit? = null
@@ -16,6 +20,17 @@ object ApiClient {
         val logging = RedactingLogInterceptor(enabled = BuildConfig.DEBUG)
         return OkHttpClient.Builder()
             .addInterceptor(logging)
+            // Many feed hosts (rss.app, Cloudflare-fronted sites, several news outlets)
+            // reject requests with OkHttp's default User-Agent, or with none at all, and
+            // return 403. A conventional UA is required in practice, not optional.
+            .addInterceptor { chain ->
+                chain.proceed(
+                    chain.request().newBuilder()
+                        .header("User-Agent", USER_AGENT)
+                        .header("Accept", "application/rss+xml, application/atom+xml, application/xml, text/xml, */*")
+                        .build()
+                )
+            }
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)

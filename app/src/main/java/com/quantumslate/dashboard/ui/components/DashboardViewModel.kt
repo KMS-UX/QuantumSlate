@@ -6,6 +6,7 @@ import com.quantumslate.dashboard.data.local.CacheExpiry
 import com.quantumslate.dashboard.data.local.CacheManager
 import com.quantumslate.dashboard.data.local.CalendarEventEntity
 import com.quantumslate.dashboard.data.local.DashboardWidget
+import com.quantumslate.dashboard.data.local.DeviceLocationProvider
 import com.quantumslate.dashboard.data.local.WidgetLayout
 import com.quantumslate.dashboard.data.local.FlightEntity
 import com.quantumslate.dashboard.data.local.MascotStateEntity
@@ -14,6 +15,7 @@ import com.quantumslate.dashboard.data.local.CacheLevel
 import com.quantumslate.dashboard.data.local.PreferencesManager
 import com.quantumslate.dashboard.data.local.SpotifyTrackEntity
 import com.quantumslate.dashboard.data.repository.CalendarRepository
+import com.quantumslate.dashboard.data.repository.WeatherLocationResolver
 import com.quantumslate.dashboard.data.repository.FlightRepository
 import com.quantumslate.dashboard.data.repository.MascotRepository
 import com.quantumslate.dashboard.data.repository.NewsRepository
@@ -66,6 +68,9 @@ data class DashboardUiState(
     // Flight request allowance
     val flightRequestsRemaining: Int? = null,
 
+    /** True when weather is blocked purely on the location permission. */
+    val locationPermissionMissing: Boolean = false,
+
     // Mascot
     val mascotState: MascotStateEntity? = null,
     val mascotAnimationsEnabled: Boolean = true,
@@ -112,6 +117,8 @@ class DashboardViewModel @Inject constructor(
     private val spotifyRepository: SpotifyRepository,
     private val calendarRepository: CalendarRepository,
     private val cacheExpiry: CacheExpiry,
+    private val deviceLocationProvider: DeviceLocationProvider,
+    private val weatherLocationResolver: WeatherLocationResolver,
     private val mascotRepository: MascotRepository,
     private val preferencesManager: PreferencesManager,
     private val cacheManager: CacheManager
@@ -182,13 +189,8 @@ class DashboardViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isWeatherLoading = true)
             
             try {
-                val location = preferencesManager.getLocation()
-                val result = if (!location.isNullOrEmpty()) {
-                    weatherRepository.fetchWeatherByLocationName(location)
-                } else {
-                    weatherRepository.fetchAndCacheWeather(40.7128, -74.0060) // Default: NYC
-                }
-                
+                val result = weatherLocationResolver.fetchForCurrentLocation()
+
                 result.onSuccess { weather ->
                     _uiState.value = _uiState.value.copy(
                         weather = weather,
@@ -200,7 +202,8 @@ class DashboardViewModel @Inject constructor(
                 }.onFailure { error ->
                     _uiState.value = _uiState.value.copy(
                         isWeatherLoading = false,
-                        weatherError = error.message ?: "Failed to fetch weather"
+                        weatherError = error.message ?: "Failed to fetch weather",
+                        locationPermissionMissing = weatherLocationResolver.isBlockedOnPermission()
                     )
                 }
             } catch (e: Exception) {
@@ -373,6 +376,12 @@ class DashboardViewModel @Inject constructor(
     /** Re-reads the calendar after the user grants permission. */
     fun onCalendarPermissionGranted() {
         loadCalendar()
+    }
+
+    /** Re-runs the weather lookup once the user grants location access. */
+    fun onLocationPermissionGranted() {
+        _uiState.value = _uiState.value.copy(locationPermissionMissing = false)
+        loadWeather()
     }
 
     // ==================== WIDGET LAYOUT ====================

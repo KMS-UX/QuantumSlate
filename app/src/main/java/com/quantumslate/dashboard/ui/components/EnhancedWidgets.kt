@@ -38,8 +38,21 @@ fun WeatherWidgetWithStatus(
     lastUpdated: Long?,
     cacheLevel: CacheLevel,
     onRefresh: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Supplied when weather is blocked purely on the location permission. */
+    onRequestLocation: (() -> Unit)? = null
 ) {
+    if (onRequestLocation != null && weather == null) {
+        PermissionPromptCard(
+            title = "🌤️ Weather",
+            message = errorMessage ?: "QuantumSlate needs location access to show local weather.",
+            actionLabel = "Grant access",
+            onAction = onRequestLocation,
+            modifier = modifier
+        )
+        return
+    }
+
     WidgetStateHandler(
         isLoading = isLoading,
         hasError = errorMessage != null,
@@ -668,5 +681,45 @@ internal fun formatRelativeTime(timestamp: Long): String {
         diff < 60 * 60 * 1000 -> "${diff / 3600000}h ago"
         diff < 24 * 60 * 60 * 1000 -> "${diff / 86400000}d ago"
         else -> SimpleDateFormat("MMM dd", Locale.getDefault()).format(Date(timestamp))
+    }
+}
+
+/**
+ * Shared prompt for a widget that is blocked on a runtime permission.
+ *
+ * Distinct from an error state on purpose: a "retry" button can never succeed without the
+ * grant, so offering one would just loop the user.
+ */
+@Composable
+internal fun PermissionPromptCard(
+    title: String,
+    message: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            )
+            Button(onClick = onAction) { Text(actionLabel) }
+        }
     }
 }

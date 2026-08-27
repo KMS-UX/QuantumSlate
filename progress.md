@@ -18,15 +18,127 @@ phase completion. Device test script: [TESTING.md](TESTING.md).
 
 | Check | Result |
 |---|---|
-| `./gradlew testDebugUnitTest` | ✅ 46 tests, 0 failures |
+| `./gradlew testDebugUnitTest` | ✅ 61 tests, 0 failures |
+| `./gradlew connectedDebugAndroidTest` | 16 instrumented tests; run on device/emulator (CI job added) |
 | `./gradlew lintDebug` | ✅ no errors |
 | `./gradlew assembleDebug` | ✅ 21.6 MB, debug-signed |
 | `./gradlew assembleRelease` | ✅ 4.3 MB (R8 + resource shrinking), unsigned without a keystore |
 | Components in APK | ✅ MainActivity, SpotifyRedirectActivity, TimeWeatherWidget, RealtimeSyncService |
 | Permissions | ✅ 9, all used (was 12 — see Phase H) |
-| Installed & run on device | ❌ **Not yet — this is the next step** |
+| Installed & run on device | ✅ First device test 2026-08-27; 4 issues found and fixed (see below) |
 
 Build environment: JDK 17, AGP 8.2.0, Gradle 8.2, Kotlin 1.9.20, compileSdk 34, minSdk 24.
+
+---
+
+## Device Test Round 1 — 2026-08-27
+
+Four issues reported. All fixed. **Two were mistakes I introduced.**
+
+### 1. Weather never asked for GPS, and didn't work when enabled
+
+Two compounding faults:
+
+- **`getLocationEnabled()` was a fifth dead setting** — read only to render its own switch,
+  acted on by nothing. Toggling it changed no behaviour whatsoever.
+- **I removed the location permissions in Phase H**, having verified no code read device
+  location. That verification was correct but the conclusion was wrong: the *feature* was
+  missing, not the permission. Removing it cemented the gap instead of exposing it.
+- The fallback was also silently wrong: with no city set, weather requested **New York**
+  (`40.7128, -74.0060` hardcoded), so a misconfigured app looked like a working one.
+
+Now: `DeviceLocationProvider` reads the last known fix via the platform `LocationManager` —
+no Play Services dependency, and no GPS radio wake-up, which matters for a device sitting on
+a desk all day. Resolution order is device location (when opted in *and* granted) → typed
+city → an explicit error naming what to do. The weather widget shows a **Grant access**
+button when it is blocked purely on permission, and re-fetches on grant. Both coarse and
+fine are requested together because some devices only return a fix from the GPS provider.
+
+### 2. Could not scroll in Minimalist or Data-Dense
+
+**None of the three Bible dashboards had `verticalScroll` at all** — only QuantumEffect did.
+Any content taller than the viewport was simply unreachable. Minimalist additionally used
+`Arrangement.Center`, which clips at *both* ends inside a scroll container; changed to `Top`.
+
+### 3. RSS feeds other than the BBC one failed
+
+Two causes:
+
+- **No `User-Agent` header.** rss.app, Cloudflare-fronted sites and several news outlets
+  return 403 to OkHttp's default UA. A conventional UA is required in practice.
+- **The parser only understood RSS 2.0 `<item>` and one date format.** Atom feeds produced
+  zero entries and surfaced as "No articles found in feed" — indistinguishable from an empty
+  feed rather than an unsupported one.
+
+New `FeedParser` handles RSS 2.0 and Atom, reads Atom's `<link href>` (preferring
+`rel="alternate"` over `rel="self"`, which points at the feed rather than the article),
+strips HTML from descriptions, and accepts nine date formats. Covered by **15 new tests**.
+
+### 4. Each refresh consumed 2 quota
+
+aviationstack's free tier is HTTP-only. When the host answers with a redirect to HTTPS,
+**OkHttp follows it automatically and the provider bills both requests**. The budget also
+recorded *before* the call, so our meter said 1 while they charged 2 — the counter was
+lying, which is worse than the double-spend itself.
+
+Fixed with a dedicated flight `OkHttpClient`: `followRedirects(false)`,
+`followSslRedirects(false)`, `retryOnConnectionFailure(false)` — a transparent retry would
+double-bill too. Counting moved into `FlightRequestCounter`, an interceptor that increments
+on each *actual* call to the aviationstack host, so the meter now matches what they charge.
+
+### Also settled
+
+- **F7 certificate pinning — user approved the recommendation against it.** Closed.
+
+---
+
+## Bug-Class Audit — 2026-08-27
+
+After four issues surfaced on the first device test, swept the codebase for more instances of
+the three patterns that produced them. **Found five more, three of them serious.**
+
+### Pattern A — settings stored but never read
+
+Enumerated every `PreferencesManager` getter and checked for a consumer outside the Settings
+screen's own display code. Seven were unconsumed.
+
+**The serious one: changing update frequency has never done anything.**
+Settings wrote to key `update_mode`; `UpdateScheduler` read key `update_frequency`. Two
+different keys. And even had they matched, `UpdateMode.REAL_TIME.name.lowercase()` is
+`"real_time"` while the scheduler compared against `"realtime"` — **two independent reasons
+it could never work**. Ambient mode never activated, and the Phase F real-time foreground
+service would never have started (TESTING.md step 12.1 would have failed).
+
+Fixed by giving `UpdateScheduler` the typed `UpdateMode` enum, so string drift is now
+impossible. Also removed, as duplicates that made the drift possible:
+`getUpdateFrequency`, `getFlightApiApiKey` (duplicate of `getFlightApiKey`),
+`getMascotAnimationsEnabled` (duplicate of `areMascotAnimationsEnabled`),
+`getSpotifyClientSecret` (unused — PKCE needs no secret, and storing one is a liability),
+`getCustomRssFeeds`, `getEnabledWidgets`, `getWidgetOrder`.
+
+`getWidgetOrder()` was also a latent data-corruption bug: it used the **same `widget_order`
+key** as the new `WidgetLayout` but with comma separators instead of pipes.
+
+**Audit now returns zero unconsumed settings.**
+
+### Pattern B — missing scroll containers
+
+Swept every screen. All four dashboards and Settings now have a scroll container; no others
+were missing one.
+
+### Pattern C — silent fallback to a hardcoded default
+
+Three more instances beyond the NYC one already fixed:
+
+| Site | Fault |
+|---|---|
+| `DashboardUpdateWorker` | Read `getLatitude()` — **a preference nothing ever wrote** — falling back to New York. Every background sync fetched NYC weather and **overwrote the user's cached local weather**, since all paths write the same row. |
+| `RealtimeSyncService` | Passed `0.0, 0.0` — the Gulf of Guinea. My own code from Phase F. |
+| `WeatherViewModel` | Hardcoded New York outright. |
+
+All four call sites now go through one `WeatherLocationResolver`: device location (opted in
+*and* granted) → typed city → an explicit failure naming what to do. The unused
+`latitude`/`longitude` preferences were removed.
 
 ---
 

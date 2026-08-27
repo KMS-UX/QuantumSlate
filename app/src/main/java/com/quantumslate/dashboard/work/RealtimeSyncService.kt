@@ -12,7 +12,7 @@ import com.quantumslate.dashboard.MainActivity
 import com.quantumslate.dashboard.R
 import com.quantumslate.dashboard.data.repository.FlightRepository
 import com.quantumslate.dashboard.data.repository.SpotifyRepository
-import com.quantumslate.dashboard.data.repository.WeatherRepository
+import com.quantumslate.dashboard.data.repository.WeatherLocationResolver
 import com.quantumslate.dashboard.notification.NotificationManager as QsNotificationManager
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -39,7 +39,7 @@ import javax.inject.Inject
 @AndroidEntryPoint
 class RealtimeSyncService : Service() {
 
-    @Inject lateinit var weatherRepository: WeatherRepository
+    @Inject lateinit var weatherLocationResolver: WeatherLocationResolver
     @Inject lateinit var spotifyRepository: SpotifyRepository
     @Inject lateinit var flightRepository: FlightRepository
 
@@ -60,7 +60,7 @@ class RealtimeSyncService : Service() {
             while (isActive) {
                 // Spotify moves fastest and is cheapest to poll (Bible §4: 30s when playing).
                 runCatching { spotifyRepository.fetchAndCachePlayback() }
-                runCatching { weatherRepository.fetchAndCacheWeather(0.0, 0.0) }
+                runCatching { weatherLocationResolver.fetchForCurrentLocation() }
                 delay(POLL_INTERVAL_MS)
             }
         }

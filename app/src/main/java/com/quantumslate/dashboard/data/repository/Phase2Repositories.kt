@@ -9,6 +9,7 @@ import com.quantumslate.dashboard.data.local.PreferencesManager
 import com.quantumslate.dashboard.data.local.SpotifyDao
 import com.quantumslate.dashboard.data.local.SpotifyTrackEntity
 import com.quantumslate.dashboard.data.remote.ApiClient
+import com.quantumslate.dashboard.data.remote.FeedParser
 import com.quantumslate.dashboard.data.remote.FlightEntry
 import com.quantumslate.dashboard.data.remote.FlightStatusResponse
 import com.quantumslate.dashboard.data.remote.flight.FlightAuthFailed
@@ -82,7 +83,9 @@ class NewsRepository @Inject constructor(
                 val articles = parseRssDocument(document, feedUrl)
                 
                 if (articles.isEmpty()) {
-                    return@withContext Result.failure(Exception("No articles found in feed"))
+                    return@withContext Result.failure(
+                        Exception("No entries found - is this a valid RSS or Atom feed?")
+                    )
                 }
                 
                 newsDao.insertArticles(articles)
@@ -93,53 +96,25 @@ class NewsRepository @Inject constructor(
         }
     }
 
-    private fun parseRssDocument(document: Document, sourceUrl: String): List<com.quantumslate.dashboard.data.local.NewsArticleEntity> {
-        val articles = mutableListOf<com.quantumslate.dashboard.data.local.NewsArticleEntity>()
-        
-        try {
-            // Simple RSS 2.0 parsing - look for item elements
-            val items = document.getElementsByTagName("item")
-            
-            for (i in 0 until minOf(items.length, 10)) {
-                val item = items.item(i) as? Element ?: continue
-                val titleNodes = item.getElementsByTagName("title")
-                val linkNodes = item.getElementsByTagName("link")
-                val descNodes = item.getElementsByTagName("description")
-                val pubDateNodes = item.getElementsByTagName("pubDate")
-                
-                val title = titleNodes.item(0)?.textContent ?: "No Title"
-                val link = linkNodes.item(0)?.textContent ?: "#"
-                val description = descNodes.item(0)?.textContent
-                val pubDateStr = pubDateNodes.item(0)?.textContent
-                
-                val pubDate = try {
-                    pubDateStr?.let { 
-                        SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", Locale.ENGLISH).parse(it)?.time 
-                    } ?: System.currentTimeMillis()
-                } catch (e: Exception) {
-                    System.currentTimeMillis()
-                }
-                
-                // Generate a unique GUID from the link
-                val guid = link.hashCode().toString()
-                
-                articles.add(
-                    com.quantumslate.dashboard.data.local.NewsArticleEntity(
-                        guid = guid,
-                        title = title,
-                        description = description,
-                        link = link,
-                        pubDate = pubDate,
-                        source = sourceUrl.substringAfter("://").substringBefore("/").take(50),
-                        imageUrl = null
-                    )
-                )
-            }
-        } catch (e: Exception) {
-            // Log error but continue with empty list
+    private fun parseRssDocument(
+        document: Document,
+        sourceUrl: String
+    ): List<com.quantumslate.dashboard.data.local.NewsArticleEntity> {
+        val sourceName = runCatching {
+            java.net.URI(sourceUrl).host?.removePrefix("www.")
+        }.getOrNull() ?: sourceUrl
+
+        return FeedParser.parse(document).map { item ->
+            com.quantumslate.dashboard.data.local.NewsArticleEntity(
+                guid = item.guid,
+                title = item.title,
+                description = item.description,
+                link = item.link,
+                pubDate = item.publishedAt,
+                source = sourceName,
+                imageUrl = null
+            )
         }
-        
-        return articles
     }
 
     suspend fun getCachedNews(): List<com.quantumslate.dashboard.data.local.NewsArticleEntity> {
@@ -198,7 +173,9 @@ class FlightRepository @Inject constructor(
                     )
             }
 
-            requestBudget.record()
+            // No record() here — FlightRequestCounter increments on the actual HTTP call,
+            // so the count matches what the provider bills even if one fetch causes more
+            // than one request.
             dataSource.fetchFlight(flightNumber, apiKey)
                 .onSuccess { flightDao.insertFlight(it) }
                 .recoverCatching { error ->

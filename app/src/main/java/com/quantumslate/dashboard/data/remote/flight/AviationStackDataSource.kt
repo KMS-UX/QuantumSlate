@@ -1,6 +1,7 @@
 package com.quantumslate.dashboard.data.remote.flight
 
 import com.quantumslate.dashboard.data.local.FlightEntity
+import com.quantumslate.dashboard.di.FlightHttpClient
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -18,7 +19,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class AviationStackDataSource @Inject constructor(
-    private val okHttpClient: OkHttpClient
+    @FlightHttpClient private val okHttpClient: OkHttpClient
 ) : FlightDataSource {
 
     override val id: String = "aviationstack"

@@ -10,6 +10,7 @@ import com.quantumslate.dashboard.data.repository.FlightRepository
 import com.quantumslate.dashboard.data.repository.MascotRepository
 import com.quantumslate.dashboard.data.repository.NewsRepository
 import com.quantumslate.dashboard.data.repository.SpotifyRepository
+import com.quantumslate.dashboard.data.repository.WeatherLocationResolver
 import com.quantumslate.dashboard.data.repository.WeatherRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -29,7 +30,8 @@ class DashboardUpdateWorker @AssistedInject constructor(
     private val spotifyRepository: SpotifyRepository,
     private val mascotRepository: MascotRepository,
     private val preferencesManager: PreferencesManager,
-    private val cacheExpiry: CacheExpiry
+    private val cacheExpiry: CacheExpiry,
+    private val weatherLocationResolver: WeatherLocationResolver
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result = coroutineScope {
@@ -67,9 +69,7 @@ class DashboardUpdateWorker @AssistedInject constructor(
                 weatherRepository.fetchWeatherByLocationName(location)
             } else {
                 // Use default coordinates (can be customized)
-                val lat = preferencesManager.getLatitude() ?: 40.7128
-                val lon = preferencesManager.getLongitude() ?: -74.0060
-                weatherRepository.fetchAndCacheWeather(lat, lon)
+                weatherLocationResolver.fetchForCurrentLocation()
             }
         } catch (e: Exception) {
             // Silently fail - will retry next update

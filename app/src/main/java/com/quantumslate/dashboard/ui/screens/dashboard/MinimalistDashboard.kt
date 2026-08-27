@@ -1,5 +1,7 @@
 package com.quantumslate.dashboard.ui.components
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.quantumslate.dashboard.ui.permissions.rememberCalendarPermissionRequester
+import com.quantumslate.dashboard.ui.permissions.rememberLocationPermissionRequester
 import com.quantumslate.dashboard.data.local.CacheLevel
 import com.quantumslate.dashboard.data.local.cacheLevelFor
 import com.quantumslate.dashboard.data.local.PreferencesManager
@@ -47,6 +50,9 @@ fun MinimalistDashboard(
             val dashboardViewModel: DashboardViewModel = hiltViewModel()
             val uiState by dashboardViewModel.uiState.collectAsState()
 
+            val requestLocationPermission = rememberLocationPermissionRequester { granted ->
+                if (granted) dashboardViewModel.onLocationPermissionGranted()
+            }
             val requestCalendarPermission = rememberCalendarPermissionRequester { granted ->
                 if (granted) dashboardViewModel.onCalendarPermissionGranted()
             }
@@ -54,9 +60,10 @@ fun MinimalistDashboard(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = 56.dp, vertical = 64.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Top
             ) {
                 // Large time and date display with refresh
                 Row(
@@ -100,7 +107,8 @@ fun MinimalistDashboard(
                     cacheLevel = uiState.weatherLastUpdated?.let { 
                         cacheLevelFor(it, 30 * 60 * 1000) 
                     } ?: CacheLevel.EXPIRED,
-                    onRefresh = { dashboardViewModel.refreshWidget(WidgetType.WEATHER) }
+                    onRefresh = { dashboardViewModel.refreshWidget(WidgetType.WEATHER) },
+                onRequestLocation = requestLocationPermission.takeIf { uiState.locationPermissionMissing }
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))

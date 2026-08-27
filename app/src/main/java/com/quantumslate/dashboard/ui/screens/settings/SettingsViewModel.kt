@@ -41,14 +41,14 @@ class SettingsViewModel @Inject constructor(
     private fun loadSettings() {
         _settingsState.value = SettingsUiState(
             openWeatherApiKey = preferencesManager.getOpenWeatherApiKey(),
-            flightApiKey = preferencesManager.getFlightApiApiKey(),
+            flightApiKey = preferencesManager.getFlightApiKey(),
             updateMode = preferencesManager.getUpdateMode(),
             autoUpdateTime = preferencesManager.getAutoUpdateTime(),
             locationEnabled = preferencesManager.getLocationEnabled(),
             darkMode = preferencesManager.getDarkMode(),
             defaultUiMode = preferencesManager.getDefaultUiMode(),
             mascotCharacter = preferencesManager.getMascotCharacter(),
-            mascotAnimationsEnabled = preferencesManager.getMascotAnimationsEnabled(),
+            mascotAnimationsEnabled = preferencesManager.areMascotAnimationsEnabled(),
             spotifyClientId = preferencesManager.getSpotifyClientId(),
             spotifyConnected = spotifyAuthManager.isConnected
         )
@@ -63,7 +63,7 @@ class SettingsViewModel @Inject constructor(
 
     fun saveFlightApiKey(key: String) {
         viewModelScope.launch {
-            preferencesManager.saveFlightApiApiKey(key)
+            preferencesManager.saveFlightApiKey(key)
             _settingsState.value = _settingsState.value.copy(flightApiKey = key)
         }
     }

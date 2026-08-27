@@ -3,6 +3,7 @@ package com.quantumslate.dashboard.ui.components
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.quantumslate.dashboard.data.local.PreferencesManager
+import com.quantumslate.dashboard.data.repository.WeatherLocationResolver
 import com.quantumslate.dashboard.data.repository.WeatherRepository
 import com.quantumslate.dashboard.domain.model.Weather
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,6 +22,7 @@ data class WeatherUiState(
 @HiltViewModel
 class WeatherViewModel @Inject constructor(
     private val weatherRepository: WeatherRepository,
+    private val weatherLocationResolver: WeatherLocationResolver,
     private val preferencesManager: PreferencesManager
 ) : ViewModel() {
 
@@ -51,7 +53,7 @@ class WeatherViewModel @Inject constructor(
             } else {
                 // Use default location or last known location
                 // For now, use a default location
-                weatherRepository.fetchAndCacheWeather(40.7128, -74.0060) // New York
+                weatherLocationResolver.fetchForCurrentLocation()
             }
 
             result.onFailure { error ->

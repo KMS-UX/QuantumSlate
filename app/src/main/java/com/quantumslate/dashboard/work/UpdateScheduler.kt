@@ -41,39 +41,38 @@ class UpdateScheduler @Inject constructor(
     fun scheduleUpdates() {
         scope.launch {
             try {
-                val updateFrequency = preferencesManager.getUpdateFrequency() ?: "daily"
-                enqueueFor(updateFrequency)
+                enqueueFor(preferencesManager.getUpdateMode())
             } catch (e: Exception) {
                 // Fall back to the safest, lowest-power schedule.
-                enqueueFor("daily")
+                enqueueFor(PreferencesManager.UpdateMode.DAILY)
             }
         }
     }
 
-    private fun enqueueFor(updateFrequency: String) {
+    private fun enqueueFor(mode: PreferencesManager.UpdateMode) {
         // Cancel whichever flavour of work is currently registered under this name.
         workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
 
         // Real-time needs a foreground service (WorkManager's floor is 15 minutes); every
         // other mode must make sure that service is not left running.
-        if (updateFrequency.lowercase() == "realtime") {
+        if (mode == PreferencesManager.UpdateMode.REAL_TIME) {
             RealtimeSyncService.start(context)
         } else {
             RealtimeSyncService.stop(context)
         }
 
-        when (updateFrequency.lowercase()) {
-            "ambient" -> workManager.enqueueUniquePeriodicWork(
+        when (mode) {
+            PreferencesManager.UpdateMode.AMBIENT -> workManager.enqueueUniquePeriodicWork(
                 UNIQUE_WORK_NAME,
                 ExistingPeriodicWorkPolicy.UPDATE,
                 createAmbientWorkRequest()
             )
-            "realtime" -> workManager.enqueueUniquePeriodicWork(
+            PreferencesManager.UpdateMode.REAL_TIME -> workManager.enqueueUniquePeriodicWork(
                 UNIQUE_WORK_NAME,
                 ExistingPeriodicWorkPolicy.UPDATE,
                 createRealtimeWorkRequest()
             )
-            else -> workManager.enqueueUniqueWork(
+            PreferencesManager.UpdateMode.DAILY -> workManager.enqueueUniqueWork(
                 UNIQUE_WORK_NAME,
                 ExistingWorkPolicy.REPLACE,
                 createDailyWorkRequest()
