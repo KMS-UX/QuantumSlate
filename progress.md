@@ -1,6 +1,6 @@
 # QuantumSlate Android Dashboard - Progress Log
 
-## Current Status: 🟢 READY FOR DEVICE TESTING — Phases A–H delivered
+## Current Status: 🟡 TWO-MODE PIVOT — awaiting device retest
 
 **Last verified:** 2026-08-27 — clean build, 46/46 unit tests, lint clean, both APKs produced.
 
@@ -89,6 +89,63 @@ on each *actual* call to the aviationstack host, so the meter now matches what t
 ### Also settled
 
 - **F7 certificate pinning — user approved the recommendation against it.** Closed.
+
+---
+
+## Scope Change — two modes, 2026-08-28
+
+**Narrowed from four dashboard modes to two: Quantum Daily (1950s newspaper) and
+QuantumEffect.** Minimalist and Data-Dense are retired.
+
+### Why
+
+The four modes differed in *skin*, not function — all showed identical data. Meanwhile the
+mode count acted as a direct multiplier on the defect class that has caused most of this
+project's bugs: something wired in one place and not another. The scrolling bug is the
+clearest case — `verticalScroll` was added to QuantumEffect when it was written and never
+back-ported to the other three, which is arithmetic more than carelessness.
+
+Quantum Daily was chosen as the anchor because Quantum Boy is atomic-age 1950s art and looks
+native there; because the widgets map onto editorial structure (forecast box, social
+calendar, headlines, arrivals board) rather than being panels in different colours; and
+because "a dashboard as your personal newspaper" is a product concept rather than a theme.
+QuantumEffect is kept for visual contrast and as the seed of a future spin-off.
+
+### How it was done safely
+
+- `UiMode` keeps all four values but each now carries `isShipping`. Retired modes stay in the
+  enum so the unreferenced dashboards still compile, while `UiMode.shipping` is the single
+  source of truth for navigation, the Settings dropdown, and the mode indicator. **Without
+  that split, Settings would have offered modes that navigate nowhere — the exact
+  dead-setting bug class hit five times already.**
+- `getDefaultUiMode()` resolves a stored retired mode to the default rather than stranding
+  the user on a dashboard that no longer exists.
+- `RETRO` renamed to `QUANTUM_DAILY`. The enum hardening added the same day means a stored
+  `"RETRO"` or `"MINIMALIST"` degrades to the default instead of crashing.
+- `MinimalistDashboard.kt` and `DataDenseDashboard.kt` remain in the repo, unreferenced. R8
+  strips them from release builds, so they cost nothing at runtime.
+- Mode dots now announce their mode by name ("Quantum Daily dashboard") instead of
+  "mode N of 4"; instrumented tests assert the shipping set is exactly these two.
+
+---
+
+## Settings Crash — partial fix, 2026-08-28
+
+Reported: the app crashes on tapping the Settings gear. **Root cause not yet confirmed — no
+stack trace available.** Two latent crashes on that path were found and fixed, either of
+which could be responsible:
+
+1. **Unguarded `Enum.valueOf()` on persisted strings.** `getUpdateMode`, `getDarkMode` and
+   `getDefaultUiMode` all parsed stored preferences with `valueOf`, which throws on any
+   unrecognised value. Since those strings are user data that any build could have written,
+   this was a crash by construction. Now parsed defensively with a fallback.
+2. **`loadSettings()` had no error handling.** It touches `EncryptedSharedPreferences`, which
+   fails outright if the keystore entry no longer matches the stored file — an in-place
+   reinstall is enough. Settings now degrades to defaults rather than crashing the one screen
+   that could fix the problem.
+
+**Still needs confirming on device.** If it recurs, capture:
+`adb logcat -c && adb logcat AndroidRuntime:E *:S`
 
 ---
 

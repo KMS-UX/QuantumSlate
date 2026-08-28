@@ -50,7 +50,7 @@ fun RetroNewspaperDashboard(
     darkMode: PreferencesManager.DarkMode = PreferencesManager.DarkMode.AUTO
 ) {
     QuantumSlateTheme(
-        uiMode = PreferencesManager.UiMode.RETRO,
+        uiMode = PreferencesManager.UiMode.QUANTUM_DAILY,
         darkMode = darkMode
     ) {
         Surface(

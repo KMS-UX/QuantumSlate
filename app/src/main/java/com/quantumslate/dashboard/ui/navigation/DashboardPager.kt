@@ -21,22 +21,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.quantumslate.dashboard.data.local.PreferencesManager
 import com.quantumslate.dashboard.ui.components.DashboardViewModel
-import com.quantumslate.dashboard.ui.components.DataDenseDashboard
-import com.quantumslate.dashboard.ui.components.MinimalistDashboard
 import com.quantumslate.dashboard.ui.components.ModeIndicator
 import com.quantumslate.dashboard.ui.components.WidgetConfigSheet
 import com.quantumslate.dashboard.ui.components.QuantumEffectDashboard
 import com.quantumslate.dashboard.ui.components.RetroNewspaperDashboard
 
-/** Ordered list of dashboard modes the user swipes between. */
-val DASHBOARD_MODES = listOf("Minimalist", "Data Dense", "Retro", "QuantumEffect")
+/**
+ * The modes the app ships.
+ *
+ * Narrowed from four to two on 2026-08-27: Minimalist and Data-Dense differed from these
+ * only in styling, and every extra mode multiplied the places each widget and each fix had
+ * to be wired. Their dashboards remain in the repo, unreferenced, for a possible spin-off.
+ */
+val DASHBOARD_MODES: List<PreferencesManager.UiMode> = PreferencesManager.UiMode.shipping
 
 /** Horizontal distance a drag must cover before it counts as a mode switch. */
 private const val SWIPE_THRESHOLD_PX = 120f
 
 /**
- * Hosts the three dashboard modes and the horizontal swipe gesture that moves between them.
+ * Hosts the shipping dashboard modes and the horizontal swipe gesture between them.
  *
  * Each mode applies its own theme internally, so this composable stays theme-neutral and
  * only owns the gesture, the mode indicator, and dispatch to the selected dashboard.
@@ -99,21 +104,15 @@ fun DashboardPager(
         color = MaterialTheme.colorScheme.background
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            when (currentMode) {
-                0 -> MinimalistDashboard(
+            when (DASHBOARD_MODES.getOrNull(currentMode)) {
+                PreferencesManager.UiMode.QUANTUM_EFFECT ->
+                    // QuantumEffect is dark by design and has no light variant.
+                    QuantumEffectDashboard(onNavigateToSettings = onNavigateToSettings)
+
+                else -> RetroNewspaperDashboard(
                     onNavigateToSettings = onNavigateToSettings,
                     darkMode = uiState.darkMode
                 )
-                1 -> DataDenseDashboard(
-                    onNavigateToSettings = onNavigateToSettings,
-                    darkMode = uiState.darkMode
-                )
-                2 -> RetroNewspaperDashboard(
-                    onNavigateToSettings = onNavigateToSettings,
-                    darkMode = uiState.darkMode
-                )
-                // QuantumEffect is dark by design and has no light variant.
-                else -> QuantumEffectDashboard(onNavigateToSettings = onNavigateToSettings)
             }
 
             PullRefreshIndicator(
@@ -139,6 +138,7 @@ fun DashboardPager(
                 modeCount = DASHBOARD_MODES.size,
                 currentMode = currentMode,
                 onModeSelected = onModeChange,
+                modeNames = DASHBOARD_MODES.map { it.displayName },
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }

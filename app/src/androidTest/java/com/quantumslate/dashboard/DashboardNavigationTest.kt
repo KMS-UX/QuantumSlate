@@ -13,6 +13,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.quantumslate.dashboard.data.local.PreferencesManager
+import com.google.common.truth.Truth.assertThat
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.Rule
@@ -36,7 +38,9 @@ class DashboardNavigationTest {
     @get:Rule(order = 1)
     val composeRule = createAndroidComposeRule<MainActivity>()
 
-    private fun modeDot(index: Int) = "Dashboard mode ${index + 1} of 4"
+    // Mode dots announce their mode by name, so these assertions also pin the shipping set.
+    private val modes = PreferencesManager.UiMode.shipping
+    private fun modeDot(index: Int) = "${modes[index].displayName} dashboard"
 
     @Test
     fun launchesShowingTheFirstMode() {
@@ -44,14 +48,23 @@ class DashboardNavigationTest {
     }
 
     @Test
-    fun allFourModesAreReachableBySwiping() {
+    fun everyShippingModeIsReachableBySwiping() {
         // Regression guard: the swipe handler once had no onHorizontalDrag callback, so the
         // app was a static single screen.
-        repeat(3) {
+        repeat(modes.lastIndex) {
             composeRule.onRoot().performTouchInput { swipeLeft() }
             composeRule.waitForIdle()
         }
-        composeRule.onNodeWithContentDescription("${modeDot(3)}, selected").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("${modeDot(modes.lastIndex)}, selected")
+            .assertIsDisplayed()
+    }
+
+    @Test
+    fun onlyShippingModesAreNavigable() {
+        // Retired modes must not reappear in navigation.
+        assertThat(modes).hasSize(2)
+        assertThat(modes.map { it.displayName })
+            .containsExactly("Quantum Daily", "QuantumEffect").inOrder()
     }
 
     @Test
@@ -65,14 +78,14 @@ class DashboardNavigationTest {
 
     @Test
     fun tappingAModeDotJumpsDirectlyToThatMode() {
-        composeRule.onNodeWithContentDescription(modeDot(2)).performClick()
+        composeRule.onNodeWithContentDescription(modeDot(modes.lastIndex)).performClick()
         composeRule.waitForIdle()
-        composeRule.onNodeWithContentDescription("${modeDot(2)}, selected").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("${modeDot(modes.lastIndex)}, selected").assertIsDisplayed()
     }
 
     @Test
     fun everyModeExposesASettingsGear() {
-        repeat(4) { index ->
+        modes.indices.forEach { index ->
             composeRule.onNodeWithContentDescription(modeDot(index)).performClick()
             composeRule.waitForIdle()
             composeRule.onAllNodesWithContentDescription("Settings").onFirst().assertIsDisplayed()
@@ -81,7 +94,7 @@ class DashboardNavigationTest {
 
     @Test
     fun settingsOpensAndBackReturnsToTheSameMode() {
-        composeRule.onNodeWithContentDescription(modeDot(2)).performClick()
+        composeRule.onNodeWithContentDescription(modeDot(modes.lastIndex)).performClick()
         composeRule.waitForIdle()
 
         composeRule.onAllNodesWithContentDescription("Settings").onFirst().performClick()
@@ -92,7 +105,7 @@ class DashboardNavigationTest {
         composeRule.waitForIdle()
 
         // The mode must survive the round trip, not reset to Minimalist.
-        composeRule.onNodeWithContentDescription("${modeDot(2)}, selected").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("${modeDot(modes.lastIndex)}, selected").assertIsDisplayed()
     }
 
     @Test
@@ -103,6 +116,6 @@ class DashboardNavigationTest {
         composeRule.waitForIdle()
 
         // Scrolling to the mode indicator only succeeds inside a real scroll container.
-        composeRule.onNode(hasContentDescription(modeDot(3))).performScrollTo().assertIsDisplayed()
+        composeRule.onNode(hasContentDescription(modeDot(modes.lastIndex))).performScrollTo().assertIsDisplayed()
     }
 }

@@ -157,11 +157,17 @@ fun SettingsScreen(
 
                 // Display Settings Section
                 SettingsSection(title = "Display") {
+                    // Only shipping modes are offered: listing a retired mode would be a
+                    // setting the user can change that navigates nowhere.
                     DropdownSetting(
                         label = "Default UI Mode",
-                        value = settingsState.defaultUiMode.name,
-                        options = PreferencesManager.UiMode.values().map { it.name },
-                        onValueChange = { viewModel.saveDefaultUiMode(PreferencesManager.UiMode.valueOf(it)) }
+                        value = settingsState.defaultUiMode.displayName,
+                        options = PreferencesManager.UiMode.shipping.map { it.displayName },
+                        onValueChange = { chosen ->
+                            PreferencesManager.UiMode.shipping
+                                .firstOrNull { it.displayName == chosen }
+                                ?.let { viewModel.saveDefaultUiMode(it) }
+                        }
                     )
                     
                     Spacer(modifier = Modifier.height(16.dp))

@@ -21,13 +21,11 @@ class MainActivity : ComponentActivity() {
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
-        // Bible §5: the user picks which mode the app opens in.
-        val startMode = when (preferencesManager.getDefaultUiMode()) {
-            PreferencesManager.UiMode.MINIMALIST -> 0
-            PreferencesManager.UiMode.DATA_DENSE -> 1
-            PreferencesManager.UiMode.RETRO -> 2
-            PreferencesManager.UiMode.QUANTUM_EFFECT -> 3
-        }
+        // Bible §5: the user picks which mode the app opens in. Index into the shipping
+        // list, so a retired mode stored by an older build resolves to the default.
+        val startMode = PreferencesManager.UiMode.shipping
+            .indexOf(preferencesManager.getDefaultUiMode())
+            .coerceAtLeast(0)
 
         setContent {
             QuantumSlateApp(startMode = startMode)

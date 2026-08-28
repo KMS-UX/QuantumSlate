@@ -10,7 +10,7 @@
 
 | Decision | Choice |
 |---|---|
-| Visual language | **Bible's 3 modes** (Minimalist / Data-Dense / Retro Newspaper). QuantumOS phosphor-CRT style is *not* adopted here — a separate QuantumOS dashboard may come later. |
+| Visual language | **Two modes as of 2026-08-28: Quantum Daily (1950s newspaper) + QuantumEffect.** Minimalist and Data-Dense retired — they differed in skin only, and each extra mode multiplied where every widget and fix had to be wired. Their code stays in the repo, unreferenced. |
 | Mascot | **Quantum Boy** (Toddler Edition), from the QuantumOS Design System. Reference art: `C:\Users\cleme\Downloads\QuantumBoy` |
 | Calendar | **Local `CalendarContract`** — no Google Sign-In, no Cloud Console. Reads calendars already synced on device. |
 | Flight data | **Pluggable `FlightDataSource`** + adaptive polling. aviationstack (100 req/mo) is the first implementation. |

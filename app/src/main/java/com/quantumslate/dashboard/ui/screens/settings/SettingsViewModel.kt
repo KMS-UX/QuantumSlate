@@ -39,7 +39,19 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun loadSettings() {
-        _settingsState.value = SettingsUiState(
+        // Reading preferences touches EncryptedSharedPreferences, which can fail outright
+        // if the keystore entry no longer matches the stored file (an in-place reinstall is
+        // enough). Falling back to defaults keeps Settings reachable so the user can
+        // re-enter their keys, instead of crashing the only screen that could fix it.
+        _settingsState.value = try {
+            buildState()
+        } catch (e: Exception) {
+            SettingsUiState()
+        }
+    }
+
+    private fun buildState(): SettingsUiState =
+        SettingsUiState(
             openWeatherApiKey = preferencesManager.getOpenWeatherApiKey(),
             flightApiKey = preferencesManager.getFlightApiKey(),
             updateMode = preferencesManager.getUpdateMode(),
@@ -52,7 +64,6 @@ class SettingsViewModel @Inject constructor(
             spotifyClientId = preferencesManager.getSpotifyClientId(),
             spotifyConnected = spotifyAuthManager.isConnected
         )
-    }
 
     fun saveOpenWeatherApiKey(key: String) {
         viewModelScope.launch {

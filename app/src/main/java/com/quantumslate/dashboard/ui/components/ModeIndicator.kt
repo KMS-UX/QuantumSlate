@@ -28,7 +28,9 @@ fun ModeIndicator(
     modeCount: Int,
     currentMode: Int,
     onModeSelected: (Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Names announced to screen readers; falls back to positional wording if absent. */
+    modeNames: List<String> = emptyList()
 ) {
     Row(
         modifier = modifier.padding(bottom = 16.dp),
@@ -44,9 +46,11 @@ fun ModeIndicator(
                     .clip(CircleShape)
                     .clickable { onModeSelected(index) }
                     .semantics {
-                        contentDescription =
-                            "Dashboard mode ${index + 1} of $modeCount" +
-                                if (selected) ", selected" else ""
+                        val name = modeNames.getOrNull(index)
+                        contentDescription = (
+                            name?.let { "$it dashboard" }
+                                ?: "Dashboard mode ${index + 1} of $modeCount"
+                            ) + if (selected) ", selected" else ""
                     },
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically

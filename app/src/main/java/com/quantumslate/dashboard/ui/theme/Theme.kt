@@ -94,14 +94,14 @@ fun QuantumSlateTheme(
         PreferencesManager.UiMode.MINIMALIST -> {
             if (useDarkTheme) MinimalistDarkColorScheme else MinimalistLightColorScheme
         }
-        PreferencesManager.UiMode.RETRO -> RetroColorScheme
+        PreferencesManager.UiMode.QUANTUM_DAILY -> RetroColorScheme
         PreferencesManager.UiMode.DATA_DENSE -> DataDenseColorScheme
         PreferencesManager.UiMode.QUANTUM_EFFECT -> QuantumEffectColorScheme
     }
 
     val typography = when (uiMode) {
         PreferencesManager.UiMode.MINIMALIST -> MinimalistTypography
-        PreferencesManager.UiMode.RETRO -> RetroTypography
+        PreferencesManager.UiMode.QUANTUM_DAILY -> RetroTypography
         PreferencesManager.UiMode.DATA_DENSE -> DataDenseTypography
         PreferencesManager.UiMode.QUANTUM_EFFECT -> QuantumEffectTypography
     }
@@ -113,7 +113,7 @@ fun QuantumSlateTheme(
             window.statusBarColor = colorScheme.background.toArgb()
             val lightStatusIcons = when (uiMode) {
                 PreferencesManager.UiMode.QUANTUM_EFFECT -> false
-                PreferencesManager.UiMode.RETRO -> true
+                PreferencesManager.UiMode.QUANTUM_DAILY -> true
                 else -> !useDarkTheme
             }
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = lightStatusIcons

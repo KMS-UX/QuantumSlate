@@ -43,7 +43,15 @@ class PreferencesManager @Inject constructor(
     fun saveSpotifyRefreshToken(token: String) = encryptedPrefs.edit().putString("spotify_refresh_token", token).apply()
 
     // User Settings (stored in regular prefs)
-    fun getUpdateMode(): UpdateMode = UpdateMode.valueOf(regularPrefs.getString("update_mode", UpdateMode.DAILY.name) ?: UpdateMode.DAILY.name)
+    /**
+     * Enum settings are parsed defensively.
+     *
+     * `valueOf` throws on any unrecognised string, and these values come from persisted user
+     * data — a value written by an older or newer build, or a partially-migrated install, is
+     * enough to crash the screen that reads it rather than degrade to a default.
+     */
+    fun getUpdateMode(): UpdateMode =
+        enumOrDefault(regularPrefs.getString("update_mode", null), UpdateMode.DAILY)
     fun saveUpdateMode(mode: UpdateMode) = regularPrefs.edit().putString("update_mode", mode.name).apply()
 
     fun getAutoUpdateTime(): String = regularPrefs.getString("auto_update_time", "08:00") ?: "08:00"
@@ -52,10 +60,13 @@ class PreferencesManager @Inject constructor(
     fun getLocationEnabled(): Boolean = regularPrefs.getBoolean("location_enabled", true)
     fun saveLocationEnabled(enabled: Boolean) = regularPrefs.edit().putBoolean("location_enabled", enabled).apply()
 
-    fun getDarkMode(): DarkMode = DarkMode.valueOf(regularPrefs.getString("dark_mode", DarkMode.AUTO.name) ?: DarkMode.AUTO.name)
+    fun getDarkMode(): DarkMode =
+        enumOrDefault(regularPrefs.getString("dark_mode", null), DarkMode.AUTO)
     fun saveDarkMode(mode: DarkMode) = regularPrefs.edit().putString("dark_mode", mode.name).apply()
 
-    fun getDefaultUiMode(): UiMode = UiMode.valueOf(regularPrefs.getString("default_ui_mode", UiMode.MINIMALIST.name) ?: UiMode.MINIMALIST.name)
+    fun getDefaultUiMode(): UiMode =
+        enumOrDefault(regularPrefs.getString("default_ui_mode", null), UiMode.default)
+            .takeIf { it.isShipping } ?: UiMode.default
     fun saveDefaultUiMode(mode: UiMode) = regularPrefs.edit().putString("default_ui_mode", mode.name).apply()
 
     fun getMascotCharacter(): String = regularPrefs.getString("mascot_character", QUANTUM_BOY) ?: QUANTUM_BOY
@@ -119,6 +130,9 @@ class PreferencesManager @Inject constructor(
     
     fun areMascotAnimationsEnabled(): Boolean = regularPrefs.getBoolean("mascot_animations_enabled", true)
 
+    private inline fun <reified T : Enum<T>> enumOrDefault(raw: String?, fallback: T): T =
+        raw?.let { value -> enumValues<T>().firstOrNull { it.name == value } } ?: fallback
+
     enum class UpdateMode { DAILY, AMBIENT, REAL_TIME }
     enum class DarkMode { LIGHT, DARK, AUTO }
     // ==================== Widget layout (Bible §5) ====================
@@ -150,5 +164,21 @@ class PreferencesManager @Inject constructor(
 
     companion object { const val QUANTUM_BOY = "quantum_boy" }
 
-    enum class UiMode { MINIMALIST, DATA_DENSE, RETRO, QUANTUM_EFFECT }
+    enum class UiMode(val displayName: String, val isShipping: Boolean) {
+        /** Retired 2026-08-27; kept so the unreferenced dashboards still compile. */
+        MINIMALIST("Minimalist", isShipping = false),
+
+        /** Retired 2026-08-27. */
+        DATA_DENSE("Data Dense", isShipping = false),
+
+        QUANTUM_DAILY("Quantum Daily", isShipping = true),
+        QUANTUM_EFFECT("QuantumEffect", isShipping = true);
+
+        companion object {
+            /** The modes the app actually navigates between. */
+            val shipping: List<UiMode> get() = entries.filter { it.isShipping }
+
+            val default: UiMode get() = QUANTUM_DAILY
+        }
+    }
 }
